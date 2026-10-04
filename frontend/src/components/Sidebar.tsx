@@ -1,7 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
-type CaptureMode = "off" | "capture" | "analyze";
+import { api, type CaptureMode, type Me } from "../lib/api";
+import { useUpdateMe } from "../lib/hooks";
 
 const MODES: { id: CaptureMode; label: string; hint: string }[] = [
   { id: "off", label: "Off", hint: "Submissions are ignored." },
@@ -69,9 +71,11 @@ const NAV = [
   },
 ];
 
-export function Sidebar() {
-  // TODO(phase 1): read and write capture mode via the API so the extension stays in sync.
-  const [mode, setMode] = useState<CaptureMode>("analyze");
+export function Sidebar({ me }: { me: Me }) {
+  const qc = useQueryClient();
+  const update = useUpdateMe();
+  const mode = me.capture_mode;
+  const setMode = (capture_mode: CaptureMode) => update.mutate({ capture_mode });
   const hint = MODES.find((m) => m.id === mode)!.hint;
 
   return (
@@ -145,6 +149,25 @@ export function Sidebar() {
           ))}
         </div>
         <span className="text-xs text-text-muted">{hint}</span>
+        <div className="mt-2 flex items-center gap-2">
+          {me.avatar_url ? (
+            <img src={me.avatar_url} alt="" className="size-5 rounded-full" />
+          ) : (
+            <span className="size-5 rounded-full bg-chip" aria-hidden />
+          )}
+          <span className="min-w-0 flex-1 truncate text-xs text-text-secondary">{me.github_login}</span>
+          <button
+            type="button"
+            onClick={async () => {
+              await api.logout();
+              qc.clear();
+              window.location.assign("/");
+            }}
+            className="text-xs text-text-muted hover:text-text"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     </nav>
   );

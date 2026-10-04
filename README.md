@@ -16,6 +16,7 @@ cp .env.example .env          # then set MASTER_KEY (command in the file)
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
+uv run arq app.worker.main.WorkerSettings   # in another terminal: the review worker
 
 # in another terminal
 cd frontend
@@ -25,4 +26,4 @@ npm run dev                   # http://localhost:5173
 
 ## Status
 
-Phase 1 (Core) in progress: foundations only — review schema, data model, provider interface, app shell.
+Phase 1 (Core) in progress. Working: GitHub login (plus a local dev login), provider keys, manual paste, the two-call review pipeline with Anthropic and Gemini, live progress over SSE, and the Review, Library, Paste, Settings and Today screens. Remaining: deployment.

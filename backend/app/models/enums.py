@@ -25,6 +25,12 @@ class ChatRole(StrEnum):
     ASSISTANT = "assistant"
 
 
+class ChatMessageStatus(StrEnum):
+    STREAMING = "streaming"
+    DONE = "done"
+    FAILED = "failed"
+
+
 class ImportAnalysisMode(StrEnum):
     FULL = "full"
     TAGS_ONLY = "tags_only"

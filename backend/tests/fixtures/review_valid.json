@@ -12,6 +12,8 @@
     "space": {"display": "O(m·n)", "normalized": "n"},
     "used_technique": "simulation",
     "optimal_techniques": ["graph_bfs"],
+    "optimal_time": {"display": "O(m·n)", "normalized": "n"},
+    "optimal_space": {"display": "O(m·n)", "normalized": "n"},
     "is_optimal": false
   },
   "tier1": {

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from app.reviews.schema import Verdict
 from app.reviews.taxonomy import ComplexityClass
 from app.reviews.validation import validate_review
 
@@ -27,7 +28,7 @@ def test_accepts_raw_json_text(valid):
 
 def test_optimal_review_skips_tiers_2_and_3(valid):
     data = copy.deepcopy(valid)
-    data["verdict"]["is_optimal"] = True
+    data["verdict"]["time"]["normalized"] = "n"  # matches optimal time and space
     del data["tier2"], data["tier3"]
     assert validate_review(data).ok
 
@@ -45,7 +46,7 @@ MALFORMED = {
     "duplicate_optimal": lambda d: d["verdict"].update(optimal_techniques=["graph_bfs"] * 2),
     "empty_optimal": lambda d: d["verdict"].update(optimal_techniques=[]),
     "missing_tier3_when_not_optimal": lambda d: d.pop("tier3"),
-    "tiers_present_when_optimal": lambda d: d["verdict"].update(is_optimal=True),
+    "tiers_present_when_optimal": lambda d: d["verdict"]["time"].update(normalized="n"),
     "too_many_related": lambda d: d["pattern"].update(
         related_problems=[{"title": f"P{i}"} for i in range(4)]
     ),
@@ -65,3 +66,19 @@ def test_malformed_output_is_rejected_with_an_error(valid, case):
 
 def test_complexity_classes_rank_best_to_worst():
     assert ComplexityClass.N.rank < ComplexityClass.N_LOG_N.rank < ComplexityClass.N_SQUARED.rank
+
+
+def test_is_optimal_is_derived_from_time_and_space(valid):
+    verdict = copy.deepcopy(valid["verdict"])
+    verdict |= {
+        "time": {"display": "O(n)", "normalized": "n"},
+        "space": {"display": "O(n)", "normalized": "n"},
+        "optimal_time": {"display": "O(n)", "normalized": "n"},
+        "optimal_space": {"display": "O(1)", "normalized": "1"},
+        "is_optimal": True,  # the model's claim is overruled: space is worse
+    }
+    assert Verdict.model_validate(verdict).is_optimal is False
+
+    verdict["optimal_space"] = {"display": "O(n)", "normalized": "n"}
+    verdict["is_optimal"] = False  # and the other way round
+    assert Verdict.model_validate(verdict).is_optimal is True

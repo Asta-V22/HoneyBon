@@ -14,14 +14,25 @@ class Usage:
     input_tokens: int = 0
     output_tokens: int = 0
 
+    def __add__(self, other: "Usage") -> "Usage":
+        return Usage(
+            self.input_tokens + other.input_tokens, self.output_tokens + other.output_tokens
+        )
+
+
+@dataclass(frozen=True)
+class Message:
+    role: Literal["user", "assistant"]
+    content: str
+
 
 @dataclass(frozen=True)
 class StructuredRequest:
     model: str
     system: str
-    messages: list[dict[str, str]]
+    messages: list[Message]
     json_schema: dict[str, Any]
-    max_tokens: int = 8192
+    max_tokens: int = 32000
 
 
 @dataclass(frozen=True)
@@ -29,20 +40,15 @@ class StructuredResult:
     raw: str  # Unvalidated JSON text; the pipeline validates it.
     usage: Usage
     latency_ms: int
-
-
-@dataclass(frozen=True)
-class ChatMessage:
-    role: Literal["user", "assistant"]
-    content: str
+    model: str  # The model that actually served the call (differs after a fallback).
 
 
 @dataclass(frozen=True)
 class ChatRequest:
     model: str
     system: str
-    messages: list[ChatMessage]
-    max_tokens: int = 4096
+    messages: list[Message]
+    max_tokens: int = 8000
 
 
 @dataclass(frozen=True)
@@ -52,7 +58,11 @@ class ChatChunk:
 
 
 class ProviderError(Exception):
-    """A provider call failed in a way the user should see (bad key, rate limit, outage)."""
+    """A provider call failed in a way the user should see (bad key, refusal, outage)."""
+
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.retryable = retryable
 
 
 class ProviderAdapter(Protocol):

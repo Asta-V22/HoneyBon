@@ -103,3 +103,64 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Markdown from models (rendered by components/Prose.tsx). */
+.prose-hb > * + * {
+  margin-top: 0.6em;
+}
+.prose-hb p {
+  margin: 0;
+}
+.prose-hb ul,
+.prose-hb ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.prose-hb ul {
+  list-style: disc;
+}
+.prose-hb ol {
+  list-style: decimal;
+}
+.prose-hb code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--chip);
+}
+.prose-hb pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--raised);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.prose-hb pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+.prose-hb blockquote {
+  margin: 0;
+  padding-left: 0.8em;
+  color: var(--text-muted);
+  border-left: 2px solid var(--border-strong);
+}
+.prose-hb h1,
+.prose-hb h2,
+.prose-hb h3,
+.prose-hb h4 {
+  margin: 0.9em 0 0;
+  font-size: 1em;
+  font-weight: 600;
+  color: var(--text);
+}
+.prose-hb hr {
+  margin: 0.9em 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}

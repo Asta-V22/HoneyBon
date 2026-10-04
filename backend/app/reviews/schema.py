@@ -1,7 +1,9 @@
 """The single review contract every provider must produce.
 
-The verdict and tier 1 are always present. When the user's code is already optimal,
-tiers 2 and 3 are omitted and the review skips straight to tier 4.
+A review is generated in two parts so the verdict and tier 1 reach the user first:
+`ReviewPartA` (verdict + tier 1) and `ReviewPartB` (tiers 2-4 + pattern). They merge into
+`Review`. When the user's code is already optimal, tiers 2 and 3 are null and the review skips
+straight to tier 4.
 """
 
 from typing import Literal
@@ -40,12 +42,26 @@ class Verdict(_Model):
     optimal_techniques: list[Technique] = Field(
         min_length=1, description="Every technique that is equally optimal for this problem."
     )
-    is_optimal: bool
+    optimal_time: Complexity = Field(description="Time complexity of the optimal solution.")
+    optimal_space: Complexity = Field(description="Space complexity of the optimal solution.")
+    is_optimal: bool = Field(
+        description="True only if neither time nor space is worse than the optimal solution's."
+    )
 
     @model_validator(mode="after")
     def _unique_optimal(self) -> "Verdict":
         if len(set(self.optimal_techniques)) != len(self.optimal_techniques):
             raise ValueError("optimal_techniques must not contain duplicates")
+        return self
+
+    @model_validator(mode="after")
+    def _derive_is_optimal(self) -> "Verdict":
+        # Derived from the complexity classes rather than trusted from the model, so every
+        # provider applies the same rule: optimal means no worse in time AND no worse in space.
+        self.is_optimal = (
+            self.time.normalized.rank <= self.optimal_time.normalized.rank
+            and self.space.normalized.rank <= self.optimal_space.normalized.rank
+        )
         return self
 
 
@@ -95,6 +111,18 @@ class RelatedProblem(_Model):
 class PatternFollowUp(_Model):
     name: str = Field(min_length=1)
     related_problems: list[RelatedProblem] = Field(min_length=2, max_length=3)
+
+
+class ReviewPartA(_Model):
+    verdict: Verdict
+    tier1: Tier1Improved
+
+
+class ReviewPartB(_Model):
+    tier2: Tier2SlightlyBetter | None = None
+    tier3: Tier3Optimal | None = None
+    tier4: Tier4CPMaster
+    pattern: PatternFollowUp
 
 
 class Review(_Model):

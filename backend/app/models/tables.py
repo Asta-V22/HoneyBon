@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Identity,
     Integer,
     LargeBinary,
     Numeric,
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from app.models.enums import (
     CaptureMode,
+    ChatMessageStatus,
     ChatRole,
     ImportAnalysisMode,
     ImportStatus,
@@ -47,9 +49,7 @@ class _UUIDPk:
 
 
 class _Timestamps:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class User(_UUIDPk, _Timestamps, Base):
@@ -112,6 +112,8 @@ class Submission(_UUIDPk, _Timestamps, Base):
     )
     problem_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("problems.id"), index=True)
     code: Mapped[str] = mapped_column(Text)
+    # User-pasted statement for non-LeetCode problems; LeetCode statements are never stored.
+    statement: Mapped[str | None] = mapped_column(Text)
     language: Mapped[str] = mapped_column(String(32))
     source: Mapped[SubmissionSource] = mapped_column(_enum(SubmissionSource))
     status: Mapped[SubmissionStatus] = mapped_column(
@@ -138,6 +140,8 @@ class Review(_UUIDPk, _Timestamps, Base):
     )
     provider: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(100))
+    served_model: Mapped[str | None] = mapped_column(String(100))  # differs after a fallback
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     review_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error: Mapped[str | None] = mapped_column(Text)
     # Denormalized from review_json for analytics queries.
@@ -146,6 +150,7 @@ class Review(_UUIDPk, _Timestamps, Base):
     time_class: Mapped[str | None] = mapped_column(String(16))
     space_class: Mapped[str | None] = mapped_column(String(16))
     optimal_time_class: Mapped[str | None] = mapped_column(String(16))
+    optimal_space_class: Mapped[str | None] = mapped_column(String(16))
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
@@ -165,7 +170,7 @@ class ChatThread(_UUIDPk, _Timestamps, Base):
     summarized_through: Mapped[int] = mapped_column(Integer, default=0)
 
     messages: Mapped[list["ChatMessage"]] = relationship(
-        back_populates="thread", order_by="ChatMessage.created_at"
+        back_populates="thread", order_by="ChatMessage.seq"
     )
 
 
@@ -175,10 +180,19 @@ class ChatMessage(_UUIDPk, _Timestamps, Base):
     thread_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("chat_threads.id", ondelete="CASCADE"), index=True
     )
+    # Insertion order; a user turn and its reply share a transaction, so created_at ties.
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(), index=True)
     role: Mapped[ChatRole] = mapped_column(_enum(ChatRole))
     content: Mapped[str] = mapped_column(Text)
+    status: Mapped[ChatMessageStatus] = mapped_column(
+        _enum(ChatMessageStatus), default=ChatMessageStatus.DONE
+    )
+    error: Mapped[str | None] = mapped_column(Text)
+    provider: Mapped[str | None] = mapped_column(String(32))
     model: Mapped[str | None] = mapped_column(String(100))
     quoted_selection: Mapped[str | None] = mapped_column(Text)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
 
     thread: Mapped[ChatThread] = relationship(back_populates="messages")
 
@@ -190,9 +204,7 @@ class ImportJob(_UUIDPk, _Timestamps, Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     repository: Mapped[str] = mapped_column(String(300))
-    status: Mapped[ImportStatus] = mapped_column(
-        _enum(ImportStatus), default=ImportStatus.PENDING
-    )
+    status: Mapped[ImportStatus] = mapped_column(_enum(ImportStatus), default=ImportStatus.PENDING)
     analysis_mode: Mapped[ImportAnalysisMode | None] = mapped_column(_enum(ImportAnalysisMode))
     total: Mapped[int] = mapped_column(Integer, default=0)
     processed: Mapped[int] = mapped_column(Integer, default=0)
