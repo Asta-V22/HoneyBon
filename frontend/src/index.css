@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/* Theme colours live in CSS variables so dark (default) and light swap in one place.
+   Dark values come from the approved mockup. One blue accent; orange only for attention. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d0e10;
+  --sidebar: #111316;
+  --surface: #131518;
+  --raised: #16181c;
+  --chip: #1b1e23;
+  --selected: #1c1f24;
+  --border: #23262b;
+  --border-strong: #2a2e34;
+  --divider: #1f2226;
+  --text: #e7e8ea;
+  --text-secondary: #a0a6ae;
+  --text-heading: #c6cbd1;
+  --text-muted: #8a9099;
+  --text-faint: #7d838b;
+  --accent: #8fa8ff;
+  --accent-text: #b3c3ff;
+  --accent-soft: rgb(143 168 255 / 0.12);
+  --on-accent: #0d0e10;
+  --attention: #f0a45d;
+  --attention-text: #f2b47a;
+  --attention-soft: rgb(240 164 93 / 0.12);
+  --ok: #7fd1b9;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #fafafb;
+  --sidebar: #f3f4f6;
+  --surface: #ffffff;
+  --raised: #f5f6f8;
+  --chip: #eef0f3;
+  --selected: #e8eaee;
+  --border: #e2e4e8;
+  --border-strong: #d4d7dc;
+  --divider: #eceef1;
+  --text: #16181c;
+  --text-secondary: #3f444b;
+  --text-heading: #2a2e34;
+  --text-muted: #5b616a;
+  --text-faint: #6b7179;
+  --accent: #3a57d6;
+  --accent-text: #2f4bc4;
+  --accent-soft: rgb(58 87 214 / 0.1);
+  --on-accent: #ffffff;
+  --attention: #b85c12;
+  --attention-text: #9a4a0b;
+  --attention-soft: rgb(184 92 18 / 0.1);
+  --ok: #1f8a6c;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-sidebar: var(--sidebar);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-chip: var(--chip);
+  --color-selected: var(--selected);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-divider: var(--divider);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-heading: var(--text-heading);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-attention: var(--attention);
+  --color-attention-text: var(--attention-text);
+  --color-attention-soft: var(--attention-soft);
+  --color-ok: var(--ok);
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

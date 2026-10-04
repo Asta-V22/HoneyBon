@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "verdict": {
+    "correct": true,
+    "summary": "Correct, but each minute re-scans the whole grid instead of expanding from the rotten frontier.",
+    "bugs": [],
+    "missed_edge_cases": ["A grid with no fresh oranges should return 0 even if there are no rotten ones."],
+    "failing_inputs": [
+      {"input": "100x100 grid with one rotten orange in a corner", "outcome": "time_limit", "reason": "O((mn)^2) re-scanning on large grids."}
+    ],
+    "time": {"display": "O((m·n)²)", "normalized": "n^2"},
+    "space": {"display": "O(m·n)", "normalized": "n"},
+    "used_technique": "simulation",
+    "optimal_techniques": ["graph_bfs"],
+    "is_optimal": false
+  },
+  "tier1": {
+    "summary": "Same simulation, but stop as soon as a pass rots nothing and avoid copying the grid.",
+    "code": "int orangesRotting(vector<vector<int>>& g) {\n  // ...\n}",
+    "line_comments": [{"line": 2, "comment": "Track the fresh count so you can exit early."}]
+  },
+  "tier2": {
+    "approach": "Collect rotten cells once per minute instead of scanning every cell.",
+    "what_changes": "Keep a list of cells that rotted last minute and only look at their neighbours.",
+    "why_faster": "Each cell is processed a constant number of times.",
+    "code": "// ...",
+    "time": {"display": "O(m·n)", "normalized": "n"},
+    "space": {"display": "O(m·n)", "normalized": "n"}
+  },
+  "tier3": {
+    "insight": "Every rotten orange spreads at the same speed, so a multi-source BFS gives the minute each cell rots.",
+    "code": "// ...",
+    "time": {"display": "O(m·n)", "normalized": "n"},
+    "space": {"display": "O(m·n)", "normalized": "n"}
+  },
+  "tier4": {
+    "notes": "Use a flat array index r*W+c and a fixed dx/dy table; process the queue level by level.",
+    "code": "// ...",
+    "interview_caveat": "Flattened indices are harder to read aloud; explain the mapping first."
+  },
+  "pattern": {
+    "name": "Multi-source BFS",
+    "related_problems": [
+      {"title": "Walls and Gates", "slug": "walls-and-gates"},
+      {"title": "01 Matrix", "slug": "01-matrix"}
+    ]
+  }
+}
