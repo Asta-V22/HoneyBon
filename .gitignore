@@ -21,3 +21,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.tsbuildinfo
+
+# Production secrets kept locally; never commit
+MASTER_KEY.prod.txt

@@ -62,7 +62,7 @@ Copy the **Client ID**, then generate and copy a **Client secret**.
 
    `SESSION_SECRET` is generated for you.
 3. Apply. The first build takes a few minutes; migrations run on every start.
-4. Check the service URL. If it is not `https://honeybon-api.onrender.com` (the name was taken),
+4. Check the service URL. If it is not `https://honeybon-1.onrender.com` (the name was taken),
    put the real URL in `frontend/vercel.json`, commit and push; Vercel redeploys.
 
 ## 6. Check it works
