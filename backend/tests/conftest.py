@@ -103,9 +103,11 @@ async def redis() -> AsyncIterator:
 class FakeQueue:
     def __init__(self) -> None:
         self.jobs: list[tuple[str, tuple]] = []
+        self.job_ids: list[str | None] = []
 
-    async def enqueue_job(self, name: str, *args) -> None:
+    async def enqueue_job(self, name: str, *args, _job_id: str | None = None) -> None:
         self.jobs.append((name, args))
+        self.job_ids.append(_job_id)
 
 
 @pytest.fixture

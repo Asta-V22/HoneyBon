@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { Sidebar } from "./components/Sidebar";
@@ -14,7 +15,7 @@ import { TodayPage } from "./pages/Today";
 export function App() {
   const { data: me, error, isLoading } = useMe();
 
-  if (isLoading) return null;
+  if (isLoading) return <Starting />;
   if (error instanceof ApiError && error.status === 401) return <Login />;
   if (!me) {
     return <p className="p-10 text-attention-text">Honeybon could not reach its server. Try reloading.</p>;
@@ -37,6 +38,24 @@ export function App() {
           </Routes>
         </div>
       </main>
+    </div>
+  );
+}
+
+/** The free API host sleeps when idle; say so instead of showing a blank page while it wakes. */
+function Starting() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+  if (!slow) return null;
+  return (
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <p role="status" className="flex items-center gap-3 text-sm text-text-muted">
+        <span className="size-2 animate-pulse rounded-full bg-accent" aria-hidden />
+        Waking the server up. After a quiet spell this can take up to a minute.
+      </p>
     </div>
   );
 }

@@ -13,6 +13,7 @@ from app.chat.service import chat_channel
 from app.core.config import get_settings
 from app.models import ChatMessage, ChatThread
 from app.models.enums import ChatMessageStatus, ChatRole
+from app.worker.recovery import chat_job_id
 
 router = APIRouter(tags=["chat"])
 
@@ -118,7 +119,9 @@ async def send_message(
     )
     session.add(reply)
     await session.commit()
-    await queue.enqueue_job("chat_reply", str(reply.id), str(submission.id))
+    await queue.enqueue_job(
+        "chat_reply", str(reply.id), str(submission.id), _job_id=chat_job_id(reply.id)
+    )
     return await _thread_out(session, thread)
 
 

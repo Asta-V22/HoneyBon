@@ -25,6 +25,7 @@ from app.models import Problem, ProviderCredential, Review, Submission, User
 from app.models.enums import SubmissionSource, SubmissionStatus
 from app.problems import detect_language, parse_problem_link, ref_from_statement
 from app.providers import DEFAULT_MODELS, PROVIDERS
+from app.worker.recovery import review_job_id
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 
@@ -101,7 +102,7 @@ async def _queue_review(
     session.add(review)
     submission.status = SubmissionStatus.QUEUED
     await session.commit()
-    await queue.enqueue_job("review_submission", str(review.id))
+    await queue.enqueue_job("review_submission", str(review.id), _job_id=review_job_id(review.id))
 
 
 async def _get_or_create_problem(session: Session, body: PasteIn) -> Problem:

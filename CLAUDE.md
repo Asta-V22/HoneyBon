@@ -65,6 +65,17 @@ npm run build                                     # typecheck + build
   the arq worker, which never reloads) after backend changes.
 - Live provider tests are opt-in: `HB_LIVE_PROVIDER=... HB_LIVE_MODEL=... HB_LIVE_API_KEY=... uv run pytest -m live -s`.
 
+## Deployment (see docs/DEPLOY.md)
+
+- Vercel serves `frontend/` and proxies `/api/*` to Render (`frontend/vercel.json`), so the session
+  cookie stays first-party. Never call the onrender.com URL from the browser directly.
+- Render runs `backend/Dockerfile` (migrations on start) from `render.yaml`, with the worker inside
+  the API (`RUN_WORKER_IN_API=true`) and a non-persistent free Key Value as Redis; Postgres is Neon.
+- `app/worker/recovery.py` re-queues unfinished reviews and fails interrupted chat replies on worker
+  start; job IDs (`review:<id>`, `chat:<id>`) make re-queueing idempotent.
+- `ENV` other than `dev` requires `SESSION_SECRET`, `MASTER_KEY` and an https `FRONTEND_ORIGIN`
+  (`Settings.check_production`). All `/api` responses are `Cache-Control: no-store`.
+
 ## Providers
 
 - Model lists and defaults: `PROVIDER_MODELS` in `app/providers/__init__.py` (first = default).

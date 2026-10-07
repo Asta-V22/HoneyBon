@@ -1,0 +1,43 @@
+# Render Blueprint: the Honeybon API (with the review worker inside it) and its Redis.
+# Postgres lives on Neon (Render's free Postgres expires after 30 days). See docs/DEPLOY.md.
+services:
+  - type: web
+    name: honeybon-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    buildFilter: # only backend changes redeploy the API
+      paths:
+        - backend/**
+    healthCheckPath: /api/health
+    envVars:
+      - key: ENV
+        value: production
+      - key: RUN_WORKER_IN_API
+        value: "true"
+      - key: REDIS_URL
+        fromService:
+          name: honeybon-kv
+          type: keyvalue
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL # Neon connection string (direct, not the -pooler host)
+        sync: false
+      - key: MASTER_KEY # Fernet key; keep a copy, losing it makes saved API keys unreadable
+        sync: false
+      - key: FRONTEND_ORIGIN # e.g. https://honeybon.vercel.app (no trailing slash)
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+
+  - type: keyvalue
+    name: honeybon-kv
+    plan: free
+    region: singapore
+    ipAllowList: [] # only Render services in this account can connect
+    maxmemoryPolicy: noeviction # never drop queued jobs to free memory

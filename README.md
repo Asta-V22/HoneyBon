@@ -24,6 +24,10 @@ npm install
 npm run dev                   # http://localhost:5173
 ```
 
+## Deploying
+
+Free-tier setup on Vercel, Render and Neon: see [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## Status
 
-Phase 1 (Core) in progress. Working: GitHub login (plus a local dev login), provider keys, manual paste, the two-call review pipeline with Anthropic and Gemini, live progress over SSE, and the Review, Library, Paste, Settings and Today screens. Remaining: deployment.
+Phase 1 (Core) is built: GitHub login (plus a local dev login), provider keys, manual paste, the two-call review pipeline with Anthropic, Gemini and Groq, live progress over SSE, and the Review, Library, Paste, Settings and Today screens. From Phase 2, the discussion panel is done. Next: the first deployment, then the LeetCode extension.
