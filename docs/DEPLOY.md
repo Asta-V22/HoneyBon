@@ -68,14 +68,20 @@ Copy the **Client ID**, then generate and copy a **Client secret**.
 ## 6. Check it works
 
 1. Open the Vercel URL. After a quiet spell the API is asleep and the page says it is waking up;
-   this takes up to a minute.
+   this takes up to a minute. Once deployed, the keep-awake ping stops it from sleeping again.
 2. Sign in with GitHub, add a provider key in Settings, paste a solution and watch the review fill
    in. That is the Phase 1 "done" bar.
 
 ## Living with the free tier
 
-- **Sleep:** Render stops the API after 15 minutes without traffic; the next visit waits about a
-  minute. Neon also pauses after 5 idle minutes and resumes in under a second.
+- **Staying awake:** Render stops a free service after 15 minutes without traffic. With
+  `KEEP_AWAKE=true` (set in `render.yaml`) the API requests its own public `/healthz` every 50
+  seconds, using the `RENDER_EXTERNAL_URL` Render provides, so it never sleeps. `/healthz` does not
+  touch the database, so Neon still pauses after 5 idle minutes and saves its compute hours.
+- **Instance hours:** an always-awake service uses about 744 of the 750 free hours Render gives a
+  workspace each month. Any other free web service in the same workspace would push it over and
+  Render would suspend free services until the month resets. To let it sleep instead, set
+  `KEEP_AWAKE=false`; the first visit after a quiet spell then waits about a minute.
 - **Restarts:** Render's free Redis is not persisted. On start the worker queues any unfinished
   reviews again and marks interrupted chat replies as failed, so nothing is silently lost.
 - **Long streams:** Vercel cuts proxied requests at 120 seconds. Progress streams reconnect on

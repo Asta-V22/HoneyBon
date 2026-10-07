@@ -12,6 +12,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api import auth, chat, health, me, submissions
 from app.core.config import get_settings
+from app.core.keep_awake import keep_awake, quiet_access_log
 
 
 @asynccontextmanager
@@ -20,18 +21,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.redis = Redis.from_url(settings.redis_url)
     app.state.queue = await create_pool(RedisSettings.from_dsn(settings.redis_url))
 
-    worker, worker_task = None, None
+    background: list[asyncio.Task] = []
+    if target := settings.keep_awake_target:
+        quiet_access_log()
+        background.append(asyncio.create_task(keep_awake(target, settings.keep_awake_interval_s)))
+
+    worker = None
     if settings.run_worker_in_api:
         from app.worker.main import worker_options
 
         worker = Worker(**worker_options(), handle_signals=False)
-        worker_task = asyncio.create_task(worker.async_run())
+        background.append(asyncio.create_task(worker.async_run()))
     try:
         yield
     finally:
         if worker is not None:
             await worker.close()
-            worker_task.cancel()
+        for task in background:
+            task.cancel()
         await app.state.queue.aclose()
         await app.state.redis.aclose()
 
@@ -72,6 +79,7 @@ def create_app() -> FastAPI:
     )
     for module in (health, auth, me, submissions, chat):
         app.include_router(module.router, prefix="/api")
+    app.include_router(health.root_router)
     return app
 
 

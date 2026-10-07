@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:5173"
     # Free hosting has no separate worker service: run the arq worker inside the API process.
     run_worker_in_api: bool = False
+    # Ping our own public /healthz so a free host that sleeps on idle (Render) stays awake.
+    # The URL defaults to RENDER_EXTERNAL_URL, which Render sets on every web service.
+    keep_awake: bool = False
+    keep_awake_url: str = ""
+    keep_awake_interval_s: float = 50
+    render_external_url: str = ""
     review_rate_limit_per_hour: int = 30
     # Groq charges prompt + max tokens against a per-minute limit (8K on the free tier).
     groq_request_token_limit: int = 8000
@@ -59,6 +65,16 @@ class Settings(BaseSettings):
     @property
     def github_redirect_uri(self) -> str:
         return f"{self.frontend_origin}/api/auth/github/callback"
+
+    @property
+    def keep_awake_target(self) -> str | None:
+        if not self.keep_awake:
+            return None
+        if self.keep_awake_url:
+            return self.keep_awake_url
+        if self.render_external_url:
+            return self.render_external_url.rstrip("/") + "/healthz"
+        return None
 
     @property
     def engine_options(self) -> dict[str, Any]:

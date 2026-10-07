@@ -100,3 +100,46 @@ async def test_restart_requeues_reviews_and_closes_replies(sessionmaker, queue):
         reply = await session.scalar(select(ChatMessage))
         assert reply.status == ChatMessageStatus.FAILED and reply.error == INTERRUPTED_REPLY
     assert isinstance(pending_id, uuid.UUID)
+
+
+async def test_healthz_is_served_at_the_root(client):
+    response = await client.get("/healthz")
+    assert response.status_code == 200 and response.json() == {"status": "ok"}
+
+
+def test_keep_awake_targets_the_public_render_url():
+    assert (
+        Settings(keep_awake=False, render_external_url="https://x.onrender.com").keep_awake_target
+        is None
+    )
+    on_render = Settings(keep_awake=True, render_external_url="https://x.onrender.com/")
+    assert on_render.keep_awake_target == "https://x.onrender.com/healthz"
+    explicit = Settings(keep_awake=True, keep_awake_url="https://other.example/healthz")
+    assert explicit.keep_awake_target == "https://other.example/healthz"
+    assert Settings(keep_awake=True).keep_awake_target is None  # nowhere public to ping
+
+
+async def test_keep_awake_pings_repeatedly_and_survives_failures():
+    import asyncio
+
+    import httpx
+
+    from app.core.keep_awake import keep_awake
+
+    hits = []
+    three_pings = asyncio.Event()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        hits.append(str(request.url))
+        if len(hits) >= 3:
+            three_pings.set()
+        if len(hits) == 1:
+            raise httpx.ConnectError("sleeping")
+        return httpx.Response(200, json={"status": "ok"})
+
+    task = asyncio.create_task(
+        keep_awake("https://x.onrender.com/healthz", 0.01, transport=httpx.MockTransport(handler))
+    )
+    await asyncio.wait_for(three_pings.wait(), timeout=5)
+    task.cancel()
+    assert hits[:3] == ["https://x.onrender.com/healthz"] * 3

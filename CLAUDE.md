@@ -73,6 +73,8 @@ npm run build                                     # typecheck + build
   the API (`RUN_WORKER_IN_API=true`) and a non-persistent free Key Value as Redis; Postgres is Neon.
 - `app/worker/recovery.py` re-queues unfinished reviews and fails interrupted chat replies on worker
   start; job IDs (`review:<id>`, `chat:<id>`) make re-queueing idempotent.
+- `KEEP_AWAKE=true` pings the public `RENDER_EXTERNAL_URL/healthz` every 50 s (`app/core/keep_awake.py`)
+  so the free service never sleeps. `/healthz` must stay DB-free so Neon can still scale to zero.
 - `ENV` other than `dev` requires `SESSION_SECRET`, `MASTER_KEY` and an https `FRONTEND_ORIGIN`
   (`Settings.check_production`). All `/api` responses are `Cache-Control: no-store`.
 
