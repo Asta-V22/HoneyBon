@@ -140,6 +140,15 @@ export interface ChatThread {
   messages: ChatMessage[];
 }
 
+export interface ExtensionToken {
+  id: string;
+  name: string;
+  last_four: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -201,6 +210,10 @@ export const api = {
   submission: (id: string) => request<Submission>("GET", `/submissions/${id}`),
   requestReview: (id: string, body: { provider?: string; model?: string }) =>
     request<Submission>("POST", `/submissions/${id}/reviews`, body),
+  analyzeAll: () => request<{ queued: number; remaining: number }>("POST", "/submissions/analyze-all", {}),
+  tokens: () => request<ExtensionToken[]>("GET", "/me/tokens"),
+  createToken: (name: string) => request<ExtensionToken & { token: string }>("POST", "/me/tokens", { name }),
+  revokeToken: (id: string) => request<void>("DELETE", `/me/tokens/${id}`),
   thread: (submissionId: string) => request<ChatThread>("GET", `/submissions/${submissionId}/chat`),
   sendChat: (
     submissionId: string,

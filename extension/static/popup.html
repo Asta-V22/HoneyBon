@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Honeybon</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span class="logo" aria-hidden="true">H</span>
+      <h1>Honeybon</h1>
+    </header>
+
+    <p class="status"><span id="status-dot" class="dot off" aria-hidden="true"></span><span id="status">Loading…</span></p>
+
+    <section aria-labelledby="mode-label">
+      <h2 id="mode-label">Auto-capture</h2>
+      <div id="modes" class="segmented" role="group" aria-labelledby="mode-label"></div>
+      <p id="mode-hint" class="muted"></p>
+    </section>
+
+    <section aria-labelledby="last-label">
+      <h2 id="last-label">Last capture</h2>
+      <p id="last" class="muted">Nothing captured yet.</p>
+      <a id="last-link" target="_blank" rel="noopener noreferrer" hidden>Open review</a>
+      <p id="outbox" class="attention"></p>
+      <button id="retry" type="button" hidden>Retry now</button>
+    </section>
+
+    <p id="error" class="attention" role="alert" hidden></p>
+
+    <details>
+      <summary>Connection settings</summary>
+      <form id="settings">
+        <label for="token">Extension token</label>
+        <input id="token" type="password" autocomplete="off" placeholder="hb_…" />
+        <p class="muted">Create one in Honeybon → Settings → Extension tokens.</p>
+        <label for="server">Honeybon address</label>
+        <input id="server" type="url" />
+        <button type="submit">Save</button>
+      </form>
+    </details>
+    <script src="popup.js"></script>
+  </body>
+</html>

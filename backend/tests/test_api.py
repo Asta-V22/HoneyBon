@@ -83,7 +83,11 @@ async def test_paste_queues_a_review(client, sessionmaker, queue):
     assert body["problem"]["platform"] == "leetcode"
     assert body["problem"]["slug"] == "rotting-oranges"
     assert body["review"]["model"] == "claude-opus-5-5"
-    assert queue.jobs == [("review_submission", (body["review"]["id"],))]
+    problem_id = body["problem"]["id"]
+    assert queue.jobs == [
+        ("review_submission", (body["review"]["id"],)),
+        ("fetch_problem_metadata", (problem_id,)),  # real title, difficulty and tags
+    ]
 
 
 async def test_statement_paste_for_other_platforms(client, sessionmaker):
@@ -156,7 +160,7 @@ async def test_failed_review_can_be_retried(client, sessionmaker, redis, queue, 
     )
     assert res.status_code == 200
     assert res.json()["status"] == "queued" and res.json()["review"]["model"] == "claude-sonnet-5-5"
-    assert len(queue.jobs) == 2
+    assert [name for name, _ in queue.jobs].count("review_submission") == 2
 
 
 async def test_delete_account_removes_everything(client, sessionmaker):

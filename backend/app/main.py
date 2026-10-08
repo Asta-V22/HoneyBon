@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.api import auth, chat, health, me, submissions
+from app.api import auth, capture, chat, health, me, submissions
 from app.core.config import get_settings
 from app.core.keep_awake import keep_awake, quiet_access_log
 
@@ -77,7 +77,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (health, auth, me, submissions, chat):
+    for module in (health, auth, me, submissions, chat, capture):
         app.include_router(module.router, prefix="/api")
     app.include_router(health.root_router)
     return app

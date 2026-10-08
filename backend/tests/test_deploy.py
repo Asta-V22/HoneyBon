@@ -49,7 +49,8 @@ async def test_review_enqueue_uses_a_stable_job_id(client, sessionmaker, queue):
     _login(client, await _make_user(sessionmaker, "alice"))
     await _with_key(client)
     body = await _paste(client)
-    assert queue.job_ids == [review_job_id(body["review"]["id"])]
+    assert queue.job_ids[0] == review_job_id(body["review"]["id"])
+    assert queue.job_ids[1] == f"meta:{body['problem']['id']}"
 
 
 async def test_restart_requeues_reviews_and_closes_replies(sessionmaker, queue):

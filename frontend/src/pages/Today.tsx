@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 
 import { SubmissionRow } from "../components/SubmissionRow";
-import { Card, ErrorText, PageHeader, SectionTitle } from "../components/ui";
+import { Button, Card, ErrorText, PageHeader, SectionTitle } from "../components/ui";
 import { api } from "../lib/api";
 import { useListNavigation } from "../lib/hooks";
 
@@ -53,7 +53,8 @@ export function TodayPage() {
         </div>
       </PageHeader>
 
-      <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-start gap-6">
+      <section className="flex min-w-0 flex-[2_1_520px] flex-col gap-3">
         <SectionTitle aside={`${today.length} submission${today.length === 1 ? "" : "s"}`}>Today's activity</SectionTitle>
         <ErrorText error={error} />
         {today.length === 0 ? (
@@ -73,6 +74,80 @@ export function TodayPage() {
           </Card>
         )}
       </section>
+      <ReviewQueue />
+      </div>
     </div>
+  );
+}
+
+const queuedFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+
+/** Submissions captured in Capture mode, waiting for you to send them for review. */
+function ReviewQueue() {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { data } = useQuery({
+    queryKey: ["submissions", "queue"],
+    queryFn: () => api.submissions({ in_queue: true, limit: 50 }),
+  });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["submissions"] });
+  const analyze = useMutation({
+    mutationFn: (id: string) => api.requestReview(id, {}),
+    onSuccess: (sub) => {
+      refresh();
+      navigate(`/review/${sub.id}`);
+    },
+  });
+  const analyzeAll = useMutation({ mutationFn: api.analyzeAll, onSuccess: refresh });
+  const items = data?.items ?? [];
+
+  return (
+    <section aria-labelledby="queue-h" className="flex min-w-0 flex-[1_1_300px] flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <h2 id="queue-h" className="text-sm font-medium text-text-heading">
+          Review queue
+        </h2>
+        <span className="text-xs text-text-faint">{data?.total ?? 0}</span>
+        {items.length > 0 && (
+          <Button
+            variant="primary"
+            className="ml-auto"
+            onClick={() => analyzeAll.mutate()}
+            disabled={analyzeAll.isPending}
+          >
+            Analyze all
+          </Button>
+        )}
+      </div>
+      {items.length === 0 ? (
+        <Card className="p-4 text-sm text-text-muted">
+          Empty. In Capture mode, accepted LeetCode submissions wait here until you analyze them.
+        </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          {items.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 border-b border-divider px-3.5 py-3 last:border-b-0">
+              <Link to={`/review/${item.id}`} className="min-w-0 flex-1 text-text no-underline">
+                <div className="truncate font-medium">{item.problem.title ?? item.problem.slug}</div>
+                <div className="text-[12.5px] text-text-muted">
+                  {[item.problem.difficulty, `captured ${queuedFormat.format(new Date(item.created_at))}`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </Link>
+              <Button onClick={() => analyze.mutate(item.id)} disabled={analyze.isPending}>
+                Analyze
+              </Button>
+            </div>
+          ))}
+        </Card>
+      )}
+      {analyzeAll.data && analyzeAll.data.remaining > 0 && (
+        <p className="text-xs text-text-muted">
+          Started {analyzeAll.data.queued}; {analyzeAll.data.remaining} more left. Run Analyze all again for the rest.
+        </p>
+      )}
+      <ErrorText error={analyze.error ?? analyzeAll.error} />
+    </section>
   );
 }

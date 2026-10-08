@@ -84,6 +84,7 @@ class ExtensionToken(_UUIDPk, _Timestamps, Base):
     )
     name: Mapped[str] = mapped_column(String(100))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    last_four: Mapped[str] = mapped_column(String(4), default="")  # shown to tell tokens apart
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -101,6 +102,9 @@ class Problem(_UUIDPk, _Timestamps, Base):
     topic_tags: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list)
     url: Mapped[str | None] = mapped_column(String(500))
     frontend_id: Mapped[str | None] = mapped_column(String(16))  # visible problem number
+    # LeetCode's internal question ID; LeetHub folder names use it (1036-rotting-oranges = #994).
+    platform_question_id: Mapped[str | None] = mapped_column(String(16))
+    metadata_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Submission(_UUIDPk, _Timestamps, Base):

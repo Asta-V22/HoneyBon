@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.crypto import decrypt_secret
 from app.core.events import publish
+from app.leetcode import ensure_metadata
 from app.models import ProviderCredential, Submission
 from app.models import Review as ReviewRow
 from app.models.enums import SubmissionStatus
@@ -62,6 +63,8 @@ async def run_review(
 
         submission.status = SubmissionStatus.ANALYZING
         row.error = None
+        # Real title and difficulty make for a better review; a failure here is not fatal.
+        await ensure_metadata(session, submission.problem)
         await session.commit()
         await publish(redis, sub_id, "status", status=SubmissionStatus.ANALYZING.value)
 

@@ -20,6 +20,7 @@ TEST_REDIS_URL = "redis://localhost:6379/15"
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["REDIS_URL"] = TEST_REDIS_URL
 os.environ["ENV"] = "dev"
+os.environ["LEETCODE_METADATA"] = "false"
 os.environ.setdefault("MASTER_KEY", Fernet.generate_key().decode())
 
 from app.core.config import get_settings  # noqa: E402

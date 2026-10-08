@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     keep_awake_interval_s: float = 50
     render_external_url: str = ""
     review_rate_limit_per_hour: int = 30
+    capture_rate_limit_per_hour: int = 120
+    # Fetch LeetCode titles, difficulty and tags (off in tests, which must not hit the network).
+    leetcode_metadata: bool = True
     # Groq charges prompt + max tokens against a per-minute limit (8K on the free tier).
     groq_request_token_limit: int = 8000
     chat_rate_limit_per_hour: int = 60

@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import selectinload
@@ -21,11 +22,12 @@ from app.api.schemas import (
 from app.api.sse import relay
 from app.core.config import get_settings
 from app.core.events import channel
+from app.leetcode import needs_metadata
 from app.models import Problem, ProviderCredential, Review, Submission, User
 from app.models.enums import SubmissionSource, SubmissionStatus
 from app.problems import detect_language, parse_problem_link, ref_from_statement
 from app.providers import DEFAULT_MODELS, PROVIDERS
-from app.worker.recovery import review_job_id
+from app.worker.recovery import metadata_job_id, review_job_id
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 
@@ -105,22 +107,40 @@ async def _queue_review(
     await queue.enqueue_job("review_submission", str(review.id), _job_id=review_job_id(review.id))
 
 
-async def _get_or_create_problem(session: Session, body: PasteIn) -> Problem:
-    ref = parse_problem_link(body.link) if body.link and body.link.strip() else None
-    ref = ref or ref_from_statement(body.statement or "")
-    platform = (body.platform or ref.platform).lower()
+DIFFICULTIES = {"Easy", "Medium", "Hard"}
+
+
+async def get_or_create_problem(
+    session: Session,
+    platform: str,
+    slug: str,
+    url: str | None,
+    title: str | None = None,
+    difficulty: str | None = None,
+) -> Problem:
+    """Problems are shared, so user-supplied title and difficulty only fill empty fields;
+    LeetCode's own metadata overwrites them once fetched."""
     problem = await session.scalar(
-        select(Problem).where(Problem.platform == platform, Problem.slug == ref.slug)
+        select(Problem).where(Problem.platform == platform, Problem.slug == slug)
     )
     if problem is None:
-        problem = Problem(platform=platform, slug=ref.slug, url=ref.url, topic_tags=[])
+        problem = Problem(platform=platform, slug=slug, url=url, topic_tags=[])
         session.add(problem)
-    if body.title and not problem.title:
-        problem.title = body.title
+    if title and not problem.title:
+        problem.title = title.strip()[:300]
+    if difficulty in DIFFICULTIES and not problem.difficulty:
+        problem.difficulty = difficulty
     if problem.title is None and platform == "leetcode":
-        problem.title = ref.slug.replace("-", " ").title()
+        problem.title = slug.replace("-", " ").title()
     await session.flush()
     return problem
+
+
+async def queue_metadata(queue: QueueDep, problem: Problem) -> None:
+    if needs_metadata(problem):
+        await queue.enqueue_job(
+            "fetch_problem_metadata", str(problem.id), _job_id=metadata_job_id(problem.id)
+        )
 
 
 # ---------------------------------------------------------------- routes
@@ -130,7 +150,11 @@ async def _get_or_create_problem(session: Session, body: PasteIn) -> Problem:
 async def paste_submission(
     body: PasteIn, user: CurrentUser, session: Session, queue: QueueDep, redis: RedisDep
 ) -> SubmissionOut:
-    problem = await _get_or_create_problem(session, body)
+    ref = parse_problem_link(body.link) if body.link and body.link.strip() else None
+    ref = ref or ref_from_statement(body.statement or "")
+    problem = await get_or_create_problem(
+        session, (body.platform or ref.platform).lower(), ref.slug, ref.url, body.title
+    )
     submission = Submission(
         user_id=user.id,
         problem_id=problem.id,
@@ -142,6 +166,7 @@ async def paste_submission(
     session.add(submission)
     await session.flush()
     await _queue_review(session, queue, redis, user, submission, body.provider, body.model)
+    await queue_metadata(queue, problem)
     await session.refresh(submission, ["problem"])
     return await _detail(session, submission)
 
@@ -156,6 +181,7 @@ async def list_submissions(
     technique: str | None = None,
     suboptimal: bool = False,
     status_: Annotated[SubmissionStatus | None, Query(alias="status")] = None,
+    in_queue: bool = False,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> SubmissionPage:
@@ -175,6 +201,11 @@ async def list_submissions(
         query = query.where(Problem.difficulty == difficulty)
     if status_:
         query = query.where(Submission.status == status_)
+    if in_queue:
+        # Captured but never sent for review (Capture mode): the review queue on Today.
+        query = query.where(
+            Submission.status == SubmissionStatus.QUEUED, latest.c.submission_id.is_(None)
+        )
     if technique:
         query = query.where(
             or_(
@@ -234,6 +265,41 @@ def _latest_reviews_subquery():
         .ext(distinct_on(Review.submission_id))
         .subquery()
     )
+
+
+ANALYZE_ALL_LIMIT = 10
+
+
+class AnalyzeAllOut(BaseModel):
+    queued: int
+    remaining: int
+
+
+@router.post("/analyze-all", response_model=AnalyzeAllOut)
+async def analyze_all(
+    body: ReviewRequestIn,
+    user: CurrentUser,
+    session: Session,
+    queue: QueueDep,
+    redis: RedisDep,
+) -> AnalyzeAllOut:
+    """Send the oldest items in the review queue for review, a batch at a time."""
+    waiting = (
+        await session.scalars(
+            select(Submission)
+            .where(
+                Submission.user_id == user.id,
+                Submission.status == SubmissionStatus.QUEUED,
+                ~select(Review.id).where(Review.submission_id == Submission.id).exists(),
+            )
+            .order_by(Submission.created_at)
+        )
+    ).all()
+    queued = 0
+    for submission in waiting[:ANALYZE_ALL_LIMIT]:
+        await _queue_review(session, queue, redis, user, submission, body.provider, body.model)
+        queued += 1
+    return AnalyzeAllOut(queued=queued, remaining=len(waiting) - queued)
 
 
 @router.get("/{submission_id}", response_model=SubmissionOut)

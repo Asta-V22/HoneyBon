@@ -28,6 +28,10 @@ def chat_job_id(message_id: object) -> str:
     return f"chat:{message_id}"
 
 
+def metadata_job_id(problem_id: object) -> str:
+    return f"meta:{problem_id}"
+
+
 async def recover_interrupted(sessionmaker: async_sessionmaker[AsyncSession], queue) -> None:
     async with sessionmaker() as session:
         pending = (

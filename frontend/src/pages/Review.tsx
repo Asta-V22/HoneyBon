@@ -14,7 +14,7 @@ import { useMe } from "../lib/hooks";
 function useLiveSubmission(id: string) {
   const qc = useQueryClient();
   const query = useQuery({ queryKey: ["submission", id], queryFn: () => api.submission(id) });
-  const running = query.data?.status === "queued" || query.data?.status === "analyzing";
+  const running = query.data ? isRunning(query.data) : false;
 
   useEffect(() => {
     if (!running) return;
@@ -80,7 +80,8 @@ export function ReviewPage() {
 
   const review = sub.review;
   const json = review?.review_json ?? null;
-  const running = sub.status === "queued" || sub.status === "analyzing";
+  const running = isRunning(sub);
+  const inQueue = sub.status === "queued" && !review;
   const problem = sub.problem;
 
   const content = (
@@ -120,6 +121,7 @@ export function ReviewPage() {
       </header>
 
       {sub.status === "failed" && review?.error && <FailedBanner sub={sub} />}
+      {inQueue && <QueuedBanner sub={sub} />}
       {json && <VerdictCard verdict={json.verdict} />}
 
       <div ref={bodyRef} className={`grid gap-6 ${discussOpen ? "" : "lg:grid-cols-2"}`}>
@@ -460,7 +462,7 @@ function ReviewFooter({ sub }: { sub: Submission }) {
   const reReview = useReReview(sub);
   const [provider, setProvider] = useState(review.provider);
   const [model, setModel] = useState(review.model);
-  const running = sub.status === "queued" || sub.status === "analyzing";
+  const running = isRunning(sub);
 
   const stats = [
     review.served_model ?? review.model,
@@ -514,5 +516,25 @@ function ReviewFooter({ sub }: { sub: Submission }) {
         <ErrorText error={reReview.error} />
       </form>
     </footer>
+  );
+}
+
+/** A review is in flight. A queued submission with no review is waiting in the review queue. */
+function isRunning(sub: Submission): boolean {
+  return sub.status === "analyzing" || (sub.status === "queued" && sub.review !== null);
+}
+
+function QueuedBanner({ sub }: { sub: Submission }) {
+  const analyze = useReReview(sub);
+  return (
+    <Card className="flex flex-wrap items-center gap-3 p-4">
+      <p className="min-w-0 flex-1 text-sm text-text-secondary">
+        Captured from LeetCode and waiting in your review queue.
+      </p>
+      <Button variant="primary" onClick={() => analyze.mutate({})} disabled={analyze.isPending}>
+        Analyze
+      </Button>
+      <ErrorText error={analyze.error} />
+    </Card>
   );
 }

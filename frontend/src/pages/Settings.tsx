@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { ModelPicker } from "../components/ModelPicker";
@@ -15,12 +15,7 @@ export function SettingsPage() {
       <PageHeader title="Settings" eyebrow={`Signed in as ${me.github_login}`} />
       <ProviderKeys me={me} />
       <DefaultModel me={me} />
-      <section className="flex flex-col gap-3">
-        <SectionTitle aside="Phase 2">Extension tokens</SectionTitle>
-        <Card className="p-4 text-sm text-text-muted">
-          The LeetCode extension and its access tokens arrive with automatic capture.
-        </Card>
-      </section>
+      <ExtensionTokens />
       <DataSection me={me} />
     </div>
   );
@@ -195,6 +190,93 @@ function DataSection({ me }: { me: Me }) {
           </div>
           <ErrorText error={del.error} />
         </div>
+      </Card>
+    </section>
+  );
+}
+
+const dateTime = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function ExtensionTokens() {
+  const qc = useQueryClient();
+  const { data: tokens, error } = useQuery({ queryKey: ["tokens"], queryFn: api.tokens });
+  const [name, setName] = useState("Chrome");
+  const [created, setCreated] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const create = useMutation({
+    mutationFn: () => api.createToken(name.trim()),
+    onSuccess: (t) => {
+      setCreated(t.token);
+      setCopied(false);
+      qc.invalidateQueries({ queryKey: ["tokens"] });
+    },
+  });
+  const revoke = useMutation({
+    mutationFn: api.revokeToken,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tokens"] }),
+  });
+  const active = (tokens ?? []).filter((t) => !t.revoked_at);
+
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionTitle aside="Lets the LeetCode extension send accepted submissions; it can do nothing else">
+        Extension tokens
+      </SectionTitle>
+      <Card className="flex flex-col gap-4 p-4">
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) create.mutate();
+          }}
+        >
+          <div className="flex-[1_1_200px]">
+            <Field label="Token name" htmlFor="token-name">
+              <input id="token-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} maxLength={100} />
+            </Field>
+          </div>
+          <Button type="submit" disabled={!name.trim() || create.isPending}>
+            Create token
+          </Button>
+        </form>
+        <ErrorText error={create.error ?? error} />
+
+        {created && (
+          <div className="flex flex-col gap-2 rounded-lg border border-accent/40 bg-accent-soft p-3">
+            <p className="text-sm text-text">
+              Copy this token into the extension now. It won't be shown again.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <code className="min-w-0 flex-1 break-all rounded-md bg-raised px-2 py-1.5 font-mono text-xs">{created}</code>
+              <Button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(created);
+                  setCopied(true);
+                }}
+              >
+                {copied ? "Copied" : "Copy"}
+              </Button>
+              <Button onClick={() => setCreated(null)}>Done</Button>
+            </div>
+          </div>
+        )}
+
+        {active.length > 0 && (
+          <ul className="flex flex-col divide-y divide-divider border-t border-divider">
+            {active.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
+                <span className="font-medium">{t.name}</span>
+                <span className="font-mono text-xs text-text-faint">…{t.last_four}</span>
+                <span className="flex-1 text-xs text-text-muted">
+                  {t.last_used_at ? `last used ${dateTime.format(new Date(t.last_used_at))}` : "never used"}
+                </span>
+                <Button onClick={() => revoke.mutate(t.id)} disabled={revoke.isPending}>
+                  Revoke
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
     </section>
   );

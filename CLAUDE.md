@@ -13,7 +13,8 @@ Visual reference: the approved mockup at https://claude.ai/artifact/2Q8itrsBcMLt
   - `app/models/` — SQLAlchemy 2 models, one per table in the spec's data model
   - `app/worker/` — arq tasks; every LLM call, import and analysis runs here, never in the API
 - `frontend/` — React 19 + TypeScript + Vite + Tailwind v4 + TanStack Query
-- `extension/` — Chrome MV3 extension (Phase 2, not started)
+- `extension/` — Chrome MV3 extension (TypeScript, esbuild). LeetCode specifics only in
+  `src/leetcode.ts`; build with `npm run build`, load `extension/dist` unpacked
 
 ## Commands
 
@@ -77,6 +78,21 @@ npm run build                                     # typecheck + build
   so the free service never sleeps. `/healthz` must stay DB-free so Neon can still scale to zero.
 - `ENV` other than `dev` requires `SESSION_SECRET`, `MASTER_KEY` and an https `FRONTEND_ORIGIN`
   (`Settings.check_production`). All `/api` responses are `Cache-Control: no-store`.
+
+## Capture (Phase 2)
+
+- Extension tokens (`/api/me/tokens`) authenticate only `/api/capture*` (`app/api/capture.py`);
+  stored as SHA-256 hashes. Capture honours the user's mode: off → ignored, capture → review
+  queue (status `queued` with no review row), analyze → review queued immediately.
+- `(user_id, external_id)` is unique, so a LeetCode submission is never captured twice.
+- LeetCode metadata (title, difficulty, tag slugs, internal question ID) comes from the public
+  GraphQL API (`app/leetcode.py`), fetched by the `fetch_problem_metadata` job and before a review.
+  It may be blocked from cloud IPs; that is never fatal. Tests set `LEETCODE_METADATA=false`.
+
+## Planned
+
+- Switch login to Clerk before Phase 3 (the GitHub import depends on it). Clerk production needs
+  a custom domain; `*.vercel.app` only supports its development instance.
 
 ## Providers
 
