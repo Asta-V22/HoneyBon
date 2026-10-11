@@ -82,3 +82,11 @@ def test_is_optimal_is_derived_from_time_and_space(valid):
     verdict["optimal_space"] = {"display": "O(n)", "normalized": "n"}
     verdict["is_optimal"] = False  # and the other way round
     assert Verdict.model_validate(verdict).is_optimal is True
+
+
+def test_sql_problems_have_their_own_techniques(valid):
+    data = copy.deepcopy(valid)
+    data["verdict"] |= {"used_technique": "sql_filtering", "optimal_techniques": ["sql_filtering"]}
+    assert validate_review(data).ok
+    data["verdict"]["used_technique"] = "scan"  # invented labels are still rejected
+    assert not validate_review(data).ok

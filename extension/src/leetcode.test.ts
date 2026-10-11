@@ -34,6 +34,9 @@ describe("LeetCode URLs", () => {
   });
 
   it("recognizes submission checks but not Run checks", () => {
+    // The form leetcode.com uses for submissions as of October 2026.
+    expect(checkSubmissionId("/submissions/detail/2169310652/v2/check/")).toBe("2169310652");
+    expect(checkSubmissionId("https://leetcode.com/submissions/detail/2169310652/v2/check/")).toBe("2169310652");
     expect(checkSubmissionId("/submissions/detail/1234567890/check/")).toBe("1234567890");
     expect(checkSubmissionId("/submissions/detail/runcode_1759_abc/check/")).toBeNull();
   });
@@ -71,6 +74,7 @@ describe("parsing", () => {
   it("parses runtime, memory and the page title", () => {
     expect(parseRuntime("N/A")).toBeNull();
     expect(parseMemory("512 KB")).toBe(512);
+    expect(parseMemory("0B")).toBeNull(); // SQL problems report no memory
     expect(titleFromDocument("678. Valid Parenthesis String - LeetCode")).toBe("Valid Parenthesis String");
     expect(titleFromDocument("LeetCode")).toBeNull();
   });

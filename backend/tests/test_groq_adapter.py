@@ -104,3 +104,28 @@ async def test_errors_are_translated(monkeypatch, error, message, retryable):
     with pytest.raises(ProviderError, match=message) as info:
         await adapter.review(_request("openai/gpt-oss-120b"))
     assert info.value.retryable is retryable
+
+
+async def test_strict_mode_rejection_becomes_an_invalid_response(monkeypatch):
+    # Groq refuses schema-breaking output with a 400; the pipeline should still get to repair it.
+    response = httpx.Response(400, request=httpx.Request("POST", "https://api.groq.com"))
+    error = groq.BadRequestError(
+        "Generated JSON does not match the expected schema",
+        response=response,
+        body={
+            "error": {
+                "code": "json_validate_failed",
+                "failed_generation": '{"verdict": {"used_technique": "scan"}}',
+            }
+        },
+    )
+    adapter, _ = _adapter(monkeypatch, error)
+    result = await adapter.review(_request("openai/gpt-oss-120b"))
+    assert result.raw == '{"verdict": {"used_technique": "scan"}}'
+
+
+async def test_other_bad_requests_still_fail(monkeypatch):
+    error = _status_error(groq.BadRequestError, 400)
+    adapter, _ = _adapter(monkeypatch, error)
+    with pytest.raises(ProviderError, match="rejected the request"):
+        await adapter.review(_request("openai/gpt-oss-120b"))

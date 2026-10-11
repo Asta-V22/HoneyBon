@@ -2,8 +2,9 @@
 // one-file fix. Pure functions only; covered by leetcode.test.ts.
 //
 // Flow on leetcode.com: POST /problems/<slug>/submit/ with {lang, question_id, typed_code}
-// returns {submission_id}; the page then polls GET /submissions/detail/<id>/check/ until
-// state is "SUCCESS", when status_msg says "Accepted" (or the failure reason).
+// returns {submission_id}; the page then polls GET /submissions/detail/<id>/v2/check/ until
+// state is "SUCCESS", when status_msg says "Accepted" (or the failure reason). Runs use
+// /submissions/detail/runcode_<…>/check/ without the version segment and are never captured.
 
 /** window.postMessage type used from the page hook to the content script. */
 export const PAGE_MESSAGE = "honeybon:accepted";
@@ -37,7 +38,8 @@ export interface CapturePayload {
 }
 
 const SUBMIT = /\/problems\/([a-z0-9-]+)\/submit\/?(?:[?#].*)?$/;
-const CHECK = /\/submissions\/detail\/(\d+)\/check\/?(?:[?#].*)?$/;
+// The version segment is optional: submissions moved to /v2/check/ (verified Oct 2026).
+const CHECK = /\/submissions\/detail\/(\d+)\/(?:v\d+\/)?check\/?(?:[?#].*)?$/;
 
 export function submitSlug(url: string): string | null {
   return SUBMIT.exec(url)?.[1] ?? null;

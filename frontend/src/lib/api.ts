@@ -227,6 +227,8 @@ export const TECHNIQUES = [
   "topological_sort", "union_find", "shortest_path", "heap", "greedy", "dynamic_programming",
   "backtracking", "bit_manipulation", "math", "trie", "segment_or_fenwick_tree",
   "intervals_and_sorting", "simulation", "brute_force",
+  "sql_filtering", "sql_joins", "sql_aggregation", "sql_subqueries_ctes", "sql_window_functions",
+  "sql_sorting_limiting",
 ] as const;
 
 const TECHNIQUE_LABELS: Record<string, string> = {
@@ -237,6 +239,12 @@ const TECHNIQUE_LABELS: Record<string, string> = {
   tree_dfs: "Tree DFS",
   segment_or_fenwick_tree: "Segment / Fenwick tree",
   intervals_and_sorting: "Intervals & sorting",
+  sql_filtering: "SQL filtering",
+  sql_joins: "SQL joins",
+  sql_aggregation: "SQL aggregation",
+  sql_subqueries_ctes: "SQL subqueries & CTEs",
+  sql_window_functions: "SQL window functions",
+  sql_sorting_limiting: "SQL sorting & limiting",
 };
 
 export function techniqueLabel(t: string): string {

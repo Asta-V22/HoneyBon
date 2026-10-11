@@ -95,6 +95,18 @@ class GroqAdapter:
                 response_format=response_format,
                 **_reasoning(request.model),
             )
+        except groq.BadRequestError as exc:
+            rejected = _rejected_generation(exc)
+            if rejected is None:
+                raise _translate(exc) from exc
+            # Strict mode refuses output that breaks the schema instead of returning it. Hand the
+            # output back as an ordinary invalid response so the pipeline's repair retry runs.
+            return StructuredResult(
+                raw=rejected,
+                usage=Usage(),
+                latency_ms=int((time.monotonic() - started) * 1000),
+                model=request.model,
+            )
         except Exception as exc:
             raise _translate(exc) from exc
 
@@ -133,6 +145,16 @@ class GroqAdapter:
         except Exception as exc:
             raise _translate(exc) from exc
         yield ChatChunk(usage=usage)
+
+
+def _rejected_generation(exc: groq.BadRequestError) -> str | None:
+    """The model output Groq refused with json_validate_failed, if that is what happened."""
+    body = exc.body if isinstance(exc.body, dict) else {}
+    error = body.get("error", body)
+    if isinstance(error, dict) and error.get("code") == "json_validate_failed":
+        generation = error.get("failed_generation")
+        return generation if isinstance(generation, str) else ""
+    return None
 
 
 _TOO_LARGE = (

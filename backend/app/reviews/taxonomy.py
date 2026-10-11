@@ -30,6 +30,13 @@ class Technique(StrEnum):
     INTERVALS_AND_SORTING = "intervals_and_sorting"
     SIMULATION = "simulation"
     BRUTE_FORCE = "brute_force"
+    # Database (SQL) problems.
+    SQL_FILTERING = "sql_filtering"
+    SQL_JOINS = "sql_joins"
+    SQL_AGGREGATION = "sql_aggregation"  # GROUP BY / HAVING
+    SQL_SUBQUERIES_CTES = "sql_subqueries_ctes"
+    SQL_WINDOW_FUNCTIONS = "sql_window_functions"
+    SQL_SORTING_LIMITING = "sql_sorting_limiting"
 
 
 class ComplexityClass(StrEnum):

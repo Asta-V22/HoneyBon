@@ -39,6 +39,7 @@ npm run build                                     # typecheck + build
 
 - Every query on user data filters by `user_id`.
 - Technique and complexity fields use the enums in `app/reviews/taxonomy.py`, never free text.
+  Database problems use the `sql_*` techniques; their complexity is estimated in table rows.
 - Provider API keys: Fernet-encrypted (`app/core/crypto.py`), decrypted only in the worker, never
   returned beyond `last_four`. Extension tokens are stored only as SHA-256 hashes.
 - User code and problem text are wrapped as data in prompts. Model output is rendered as sanitized
@@ -101,6 +102,8 @@ npm run build                                     # typecheck + build
   single larger request (413). The adapter sizes output to fit `GROQ_REQUEST_TOKEN_LIMIT`, keeps
   reasoning hidden and at low effort, and lets the SDK wait out 429s.
 - Gemini retries 503/429 twice with backoff; Anthropic's SDK does this itself.
+- Groq strict mode rejects schema-breaking output with a 400 (`json_validate_failed`); the adapter
+  returns its `failed_generation` as an ordinary invalid response so the repair retry still runs.
 
 ## Discussion panel
 

@@ -25,6 +25,7 @@ Rules for every field:
 - Complexity `display` is human text like "O(n log n)"; `normalized` is one of {_CLASSES}. Treat every \
 input size as n when normalizing (O(m*n) normalizes to "n^2").
 - Code you write is in the same language as the user's code, complete, and runnable on the platform.
+- Database (SQL) problems use only the sql_* techniques. Estimate their complexity in table rows n, assuming no indexes unless the problem says otherwise (a full scan is "n", a sort or sort-merge join is "n log n", a nested-loop join or correlated subquery is "n^2"). For tier 4, show the most idiomatic advanced SQL (window functions, CTEs) instead of contest tricks.
 - Be concrete and brief. Talk to the author as "you". No praise padding."""
 
 
