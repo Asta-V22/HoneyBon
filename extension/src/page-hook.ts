@@ -6,12 +6,15 @@ import {
   buildCapture,
   checkSubmissionId,
   isAccepted,
+  METADATA_QUERY,
   PAGE_MESSAGE,
+  parseQuestionMetadata,
   parseCheck,
   parseSubmitBody,
   parseSubmitResponse,
   submitSlug,
   titleFromDocument,
+  type QuestionMetadata,
   type SubmitInfo,
 } from "./leetcode";
 
@@ -35,8 +38,26 @@ function onCheck(url: string, responseBody: unknown): void {
   submitted.delete(id);
   if (!isAccepted(check)) return; // v1 captures accepted submissions only
   sent.add(id);
-  const payload = buildCapture(info, check, titleFromDocument(document.title));
-  window.postMessage({ type: PAGE_MESSAGE, payload }, window.location.origin);
+  void questionMetadata(info.slug).then((metadata) => {
+    const payload = buildCapture(info, check, titleFromDocument(document.title), metadata);
+    window.postMessage({ type: PAGE_MESSAGE, payload }, window.location.origin);
+  });
+}
+
+/** Ask LeetCode itself (same origin, the user's own session) for the problem's metadata. */
+async function questionMetadata(slug: string): Promise<QuestionMetadata | null> {
+  try {
+    const response = await originalFetch.call(window, "/graphql/", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: METADATA_QUERY, variables: { titleSlug: slug } }),
+      signal: AbortSignal.timeout(5000),
+    });
+    return parseQuestionMetadata(await response.json());
+  } catch {
+    return null; // capture still goes ahead without it
+  }
 }
 
 function handle(url: string, requestBody: unknown, responseBody: unknown): void {

@@ -35,7 +35,31 @@ export interface CapturePayload {
   memory_kb: number | null;
   submitted_at: string | null;
   title: string | null;
+  // Problem metadata read from LeetCode in the user's browser. The server's own fetch is often
+  // blocked from cloud IPs, so these fill in what it cannot get.
+  difficulty: string | null;
+  topic_tags: string[];
+  frontend_id: string | null;
+  question_id: string | null;
 }
+
+export interface QuestionMetadata {
+  title: string | null;
+  difficulty: string | null;
+  topicTags: string[];
+  frontendId: string | null;
+  questionId: string | null;
+}
+
+export const METADATA_QUERY = `query honeybonQuestion($titleSlug: String!) {
+  question(titleSlug: $titleSlug) {
+    questionId
+    questionFrontendId
+    title
+    difficulty
+    topicTags { slug }
+  }
+}`;
 
 const SUBMIT = /\/problems\/([a-z0-9-]+)\/submit\/?(?:[?#].*)?$/;
 // The version segment is optional: submissions moved to /v2/check/ (verified Oct 2026).
@@ -106,7 +130,29 @@ export function titleFromDocument(documentTitle: string): string | null {
   return match ? match[1].trim() : null;
 }
 
-export function buildCapture(submit: SubmitInfo, check: CheckResult, title: string | null): CapturePayload {
+/** Reads LeetCode's GraphQL `question` response; anything unexpected becomes null. */
+export function parseQuestionMetadata(body: unknown): QuestionMetadata | null {
+  const question = asObject(asObject(asObject(body)?.data)?.question);
+  if (!question) return null;
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const id = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : null);
+  const difficulty = text(question.difficulty);
+  const tags = Array.isArray(question.topicTags) ? question.topicTags : [];
+  return {
+    title: text(question.title),
+    difficulty: difficulty && ["Easy", "Medium", "Hard"].includes(difficulty) ? difficulty : null,
+    topicTags: tags.map((t) => text(asObject(t)?.slug)).filter((s): s is string => s !== null),
+    frontendId: id(question.questionFrontendId),
+    questionId: id(question.questionId),
+  };
+}
+
+export function buildCapture(
+  submit: SubmitInfo,
+  check: CheckResult,
+  title: string | null,
+  metadata: QuestionMetadata | null = null,
+): CapturePayload {
   return {
     slug: submit.slug,
     submission_id: check.submissionId,
@@ -116,7 +162,11 @@ export function buildCapture(submit: SubmitInfo, check: CheckResult, title: stri
     runtime_ms: check.runtimeMs,
     memory_kb: check.memoryKb,
     submitted_at: check.finishedAt,
-    title,
+    title: metadata?.title ?? title,
+    difficulty: metadata?.difficulty ?? null,
+    topic_tags: metadata?.topicTags ?? [],
+    frontend_id: metadata?.frontendId ?? null,
+    question_id: metadata?.questionId ?? submit.questionId,
   };
 }
 

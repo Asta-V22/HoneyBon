@@ -88,7 +88,9 @@ npm run build                                     # typecheck + build
 - `(user_id, external_id)` is unique, so a LeetCode submission is never captured twice.
 - LeetCode metadata (title, difficulty, tag slugs, internal question ID) comes from the public
   GraphQL API (`app/leetcode.py`), fetched by the `fetch_problem_metadata` job and before a review.
-  It may be blocked from cloud IPs; that is never fatal. Tests set `LEETCODE_METADATA=false`.
+  It is blocked from Render's IPs in practice, so the extension also reads the metadata from
+  LeetCode in the user's browser and sends it with each capture; those values only fill empty
+  fields. Never fatal either way. Tests set `LEETCODE_METADATA=false`.
 
 ## Planned
 

@@ -130,9 +130,15 @@ class CaptureIn(BaseModel):
     runtime_ms: int | None = Field(default=None, ge=0)
     memory_kb: int | None = Field(default=None, ge=0)
     submitted_at: datetime | None = None
-    # Hints read from the page, used only until LeetCode's metadata is fetched.
+    # Metadata the extension read from LeetCode in the user's browser. The server's own fetch is
+    # often blocked from cloud IPs; these only fill fields that are still empty.
     title: str | None = Field(default=None, max_length=300)
     difficulty: str | None = Field(default=None, max_length=16)
+    topic_tags: list[Annotated[str, Field(max_length=64, pattern=r"^[a-z0-9-]+$")]] = Field(
+        default_factory=list, max_length=30
+    )
+    frontend_id: str | None = Field(default=None, max_length=16, pattern=r"^\d+$")
+    question_id: str | None = Field(default=None, max_length=16, pattern=r"^\d+$")
 
     @field_validator("slug")
     @classmethod
@@ -198,6 +204,9 @@ async def capture(
         f"https://leetcode.com/problems/{body.slug}/",
         body.title,
         body.difficulty,
+        body.topic_tags,
+        body.frontend_id,
+        body.question_id,
     )
     language = body.language.strip().lower()
     submission = Submission(

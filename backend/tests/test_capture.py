@@ -196,3 +196,51 @@ async def test_popup_reads_and_sets_the_capture_mode(client, sessionmaker):
 async def test_bad_slugs_are_rejected(client, sessionmaker, slug):
     token = await _token(client, sessionmaker)
     assert (await _capture(client, token, slug=slug)).status_code == 422
+
+
+async def test_capture_fills_metadata_the_server_could_not_fetch(client, sessionmaker):
+    token = await _token(client, sessionmaker)
+    await _capture(
+        client,
+        token,
+        slug="invalid-tweets",
+        title="Invalid Tweets",
+        difficulty="Easy",
+        topic_tags=["database"],
+        frontend_id="1683",
+        question_id="1827",
+    )
+    async with sessionmaker() as session:
+        problem = await session.scalar(select(Problem).where(Problem.slug == "invalid-tweets"))
+        assert (problem.title, problem.difficulty, problem.topic_tags) == (
+            "Invalid Tweets",
+            "Easy",
+            ["database"],
+        )
+        assert (problem.frontend_id, problem.platform_question_id) == ("1683", "1827")
+
+
+async def test_metadata_hints_never_overwrite_existing_values(client, sessionmaker):
+    token = await _token(client, sessionmaker)
+    await _capture(client, token, difficulty="Medium", topic_tags=["greedy"])
+    await _capture(
+        client,
+        token,
+        submission_id="99",
+        difficulty="Hard",
+        topic_tags=["made-up"],
+        title="Spoofed",
+    )
+    async with sessionmaker() as session:
+        problem = await session.scalar(select(Problem))
+        assert (problem.title, problem.difficulty, problem.topic_tags) == (
+            "Valid Parenthesis String",
+            "Medium",
+            ["greedy"],
+        )
+
+
+async def test_bad_metadata_is_rejected(client, sessionmaker):
+    token = await _token(client, sessionmaker)
+    assert (await _capture(client, token, topic_tags=["<script>"])).status_code == 422
+    assert (await _capture(client, token, frontend_id="12a")).status_code == 422

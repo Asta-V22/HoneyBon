@@ -6,6 +6,7 @@ import {
   isAccepted,
   parseCheck,
   parseMemory,
+  parseQuestionMetadata,
   parseRuntime,
   parseSubmitBody,
   parseSubmitResponse,
@@ -88,4 +89,31 @@ it("builds the capture payload the API expects", () => {
 
 it("backs off 1, 2, 4, 8, 16, then 30 minutes", () => {
   expect([1, 2, 3, 4, 5, 6, 7].map(backoffMinutes)).toEqual([1, 2, 4, 8, 16, 30, 30]);
+});
+
+it("reads problem metadata from LeetCode's GraphQL response", () => {
+  const body = {
+    data: {
+      question: {
+        questionId: "1827",
+        questionFrontendId: "1683",
+        title: "Invalid Tweets",
+        difficulty: "Easy",
+        topicTags: [{ slug: "database" }],
+      },
+    },
+  };
+  expect(parseQuestionMetadata(body)).toEqual({
+    title: "Invalid Tweets",
+    difficulty: "Easy",
+    topicTags: ["database"],
+    frontendId: "1683",
+    questionId: "1827",
+  });
+  expect(parseQuestionMetadata({ data: { question: null } })).toBeNull();
+  expect(parseQuestionMetadata({ data: { question: { difficulty: "Spicy" } } })?.difficulty).toBeNull();
+
+  const submit = { slug: "invalid-tweets", language: "mysql", code: "x", questionId: "1827" };
+  const payload = buildCapture(submit, parseCheck("42", CHECK_ACCEPTED)!, "page title", parseQuestionMetadata(body));
+  expect(payload).toMatchObject({ title: "Invalid Tweets", difficulty: "Easy", topic_tags: ["database"], frontend_id: "1683" });
 });

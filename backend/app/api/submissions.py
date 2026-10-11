@@ -117,9 +117,12 @@ async def get_or_create_problem(
     url: str | None,
     title: str | None = None,
     difficulty: str | None = None,
+    topic_tags: list[str] | None = None,
+    frontend_id: str | None = None,
+    platform_question_id: str | None = None,
 ) -> Problem:
-    """Problems are shared, so user-supplied title and difficulty only fill empty fields;
-    LeetCode's own metadata overwrites them once fetched."""
+    """Problems are shared, so user-supplied metadata only fills empty fields; the server's own
+    LeetCode fetch overwrites it whenever that succeeds."""
     problem = await session.scalar(
         select(Problem).where(Problem.platform == platform, Problem.slug == slug)
     )
@@ -130,6 +133,12 @@ async def get_or_create_problem(
         problem.title = title.strip()[:300]
     if difficulty in DIFFICULTIES and not problem.difficulty:
         problem.difficulty = difficulty
+    if topic_tags and not problem.topic_tags:
+        problem.topic_tags = topic_tags
+    if frontend_id and not problem.frontend_id:
+        problem.frontend_id = frontend_id
+    if platform_question_id and not problem.platform_question_id:
+        problem.platform_question_id = platform_question_id
     if problem.title is None and platform == "leetcode":
         problem.title = slug.replace("-", " ").title()
     await session.flush()
