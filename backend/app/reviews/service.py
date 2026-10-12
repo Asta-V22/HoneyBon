@@ -20,7 +20,7 @@ from app.providers.base import ProviderAdapter, ProviderError
 from app.reviews.pipeline import CallStats, ReviewFailed, generate_review
 from app.reviews.pricing import estimate_cost
 from app.reviews.prompts import ReviewInput
-from app.reviews.schema import Review, ReviewPartA
+from app.reviews.schema import Review, ReviewPartA, Verdict
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ async def _load(session: AsyncSession, review_id: uuid.UUID) -> ReviewRow | None
     )
 
 
-def _input(submission: Submission) -> ReviewInput:
+def review_input(submission: Submission) -> ReviewInput:
     problem = submission.problem
     return ReviewInput(
         platform=problem.platform,
@@ -87,7 +87,9 @@ async def run_review(
                 await session.commit()
                 await publish(redis, sub_id, "part", part="a")
 
-            review = await generate_review(adapter, row.model, _input(submission), stats, on_part_a)
+            review = await generate_review(
+                adapter, row.model, review_input(submission), stats, on_part_a
+            )
         except (ProviderError, ReviewFailed) as exc:
             await _fail(session, redis, row, stats, str(exc))
             return
@@ -111,7 +113,7 @@ async def run_review(
         )
 
 
-def _record_stats(row: ReviewRow, stats: CallStats) -> None:
+def record_stats(row: ReviewRow, stats: CallStats) -> None:
     row.served_model = stats.served_model
     row.input_tokens = stats.usage.input_tokens
     row.output_tokens = stats.usage.output_tokens
@@ -124,22 +126,26 @@ def _record_stats(row: ReviewRow, stats: CallStats) -> None:
 
 
 def _store(row: ReviewRow, review: Review, stats: CallStats) -> None:
-    verdict = review.verdict
     row.review_json = review.model_dump(mode="json")
+    store_verdict(row, review.verdict)
+    record_stats(row, stats)
+
+
+def store_verdict(row: ReviewRow, verdict: Verdict) -> None:
+    """Copy the fields analytics query into their own columns."""
     row.used_technique = verdict.used_technique.value
     row.optimal_techniques = [t.value for t in verdict.optimal_techniques]
     row.time_class = verdict.time.normalized.value
     row.space_class = verdict.space.normalized.value
     row.optimal_time_class = verdict.optimal_time.normalized.value
     row.optimal_space_class = verdict.optimal_space.normalized.value
-    _record_stats(row, stats)
 
 
 async def _fail(
     session: AsyncSession, redis: Redis, row: ReviewRow, stats: CallStats, error: str
 ) -> None:
     row.error = error
-    _record_stats(row, stats)
+    record_stats(row, stats)
     row.submission.status = SubmissionStatus.FAILED
     await session.commit()
     await publish(redis, row.submission_id, "failed", error=error)

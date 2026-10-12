@@ -25,7 +25,12 @@ from app.core.events import channel
 from app.leetcode import needs_metadata
 from app.models import Problem, ProviderCredential, Review, Submission, User
 from app.models.enums import SubmissionSource, SubmissionStatus
-from app.problems import detect_language, parse_problem_link, ref_from_statement
+from app.problems import (
+    detect_language,
+    get_or_create_problem,
+    parse_problem_link,
+    ref_from_statement,
+)
 from app.providers import DEFAULT_MODELS, PROVIDERS
 from app.worker.recovery import metadata_job_id, review_job_id
 
@@ -107,44 +112,6 @@ async def _queue_review(
     await queue.enqueue_job("review_submission", str(review.id), _job_id=review_job_id(review.id))
 
 
-DIFFICULTIES = {"Easy", "Medium", "Hard"}
-
-
-async def get_or_create_problem(
-    session: Session,
-    platform: str,
-    slug: str,
-    url: str | None,
-    title: str | None = None,
-    difficulty: str | None = None,
-    topic_tags: list[str] | None = None,
-    frontend_id: str | None = None,
-    platform_question_id: str | None = None,
-) -> Problem:
-    """Problems are shared, so user-supplied metadata only fills empty fields; the server's own
-    LeetCode fetch overwrites it whenever that succeeds."""
-    problem = await session.scalar(
-        select(Problem).where(Problem.platform == platform, Problem.slug == slug)
-    )
-    if problem is None:
-        problem = Problem(platform=platform, slug=slug, url=url, topic_tags=[])
-        session.add(problem)
-    if title and not problem.title:
-        problem.title = title.strip()[:300]
-    if difficulty in DIFFICULTIES and not problem.difficulty:
-        problem.difficulty = difficulty
-    if topic_tags and not problem.topic_tags:
-        problem.topic_tags = topic_tags
-    if frontend_id and not problem.frontend_id:
-        problem.frontend_id = frontend_id
-    if platform_question_id and not problem.platform_question_id:
-        problem.platform_question_id = platform_question_id
-    if problem.title is None and platform == "leetcode":
-        problem.title = slug.replace("-", " ").title()
-    await session.flush()
-    return problem
-
-
 async def queue_metadata(queue: QueueDep, problem: Problem) -> None:
     if needs_metadata(problem):
         await queue.enqueue_job(
@@ -191,6 +158,7 @@ async def list_submissions(
     suboptimal: bool = False,
     status_: Annotated[SubmissionStatus | None, Query(alias="status")] = None,
     in_queue: bool = False,
+    exclude_source: SubmissionSource | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> SubmissionPage:
@@ -210,6 +178,8 @@ async def list_submissions(
         query = query.where(Problem.difficulty == difficulty)
     if status_:
         query = query.where(Submission.status == status_)
+    if exclude_source:
+        query = query.where(Submission.source != exclude_source)
     if in_queue:
         # Captured but never sent for review (Capture mode): the review queue on Today.
         query = query.where(

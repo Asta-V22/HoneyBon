@@ -1,7 +1,7 @@
 // Typed client for the Honeybon API. Same-origin (/api), so the httpOnly session cookie rides along.
 
 export type CaptureMode = "off" | "capture" | "analyze";
-export type SubmissionStatus = "queued" | "analyzing" | "reviewed" | "failed";
+export type SubmissionStatus = "queued" | "analyzing" | "reviewed" | "failed" | "imported";
 
 export interface ProviderKey {
   provider: string;
@@ -52,7 +52,8 @@ export interface ReviewJson {
     optimal_space?: Complexity;
     is_optimal: boolean;
   };
-  tier1: { summary: string; code: string; line_comments: { line: number; comment: string }[] };
+  /** Absent on a quick (tags-only) analysis, which has a verdict and nothing else. */
+  tier1?: { summary: string; code: string; line_comments: { line: number; comment: string }[] };
   tier2?: {
     approach: string;
     what_changes: string;
@@ -68,6 +69,8 @@ export interface ReviewJson {
 
 export interface Review {
   id: string;
+  /** "tags": the cheap import analysis — technique and complexity only, no tiers. */
+  kind: "full" | "tags";
   provider: string;
   model: string;
   served_model: string | null;
@@ -149,6 +152,83 @@ export interface ExtensionToken {
   revoked_at: string | null;
 }
 
+export type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type AnalysisMode = "full" | "tags_only" | "none";
+
+export interface ImportJob {
+  id: string;
+  repository: string;
+  status: JobStatus;
+  total: number;
+  processed: number;
+  imported: number;
+  duplicates: number;
+  unmatched: { folder: string; files: { path: string; language: string }[] }[];
+  error: string | null;
+  analysis_mode: AnalysisMode | null;
+  analysis_status: JobStatus | null;
+  analysis_provider: string | null;
+  analysis_model: string | null;
+  analysis_total: number;
+  analysis_done: number;
+  analysis_failed: number;
+  analysis_error: string | null;
+  pending: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModeEstimate {
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: string | null;
+}
+
+export interface ImportEstimate {
+  count: number;
+  provider: string;
+  model: string;
+  tags_only: ModeEstimate;
+  full: ModeEstimate;
+}
+
+export interface InsightCard {
+  technique: string;
+  avoided: number;
+  worse: number;
+  out_of: number;
+  usual_instead: string;
+  submission_ids: string[];
+}
+
+export interface InsightItem {
+  submission_id: string;
+  title: string;
+  difficulty: string | null;
+  platform: string;
+  used: string;
+  optimal: string[];
+  needed: string;
+  match: boolean;
+  worse: boolean;
+  low_confidence: boolean | null;
+}
+
+export interface Insights {
+  problems: number;
+  matched: number;
+  style_mismatches: number;
+  worse_mismatches: number;
+  checked: number;
+  disagreements: number;
+  needed: string[];
+  used: string[];
+  cells: { needed: string; used: string; count: number; worse: number }[];
+  items: InsightItem[];
+  card: InsightCard | null;
+  min_problems: number;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -214,6 +294,25 @@ export const api = {
   tokens: () => request<ExtensionToken[]>("GET", "/me/tokens"),
   createToken: (name: string) => request<ExtensionToken & { token: string }>("POST", "/me/tokens", { name }),
   revokeToken: (id: string) => request<void>("DELETE", `/me/tokens/${id}`),
+  imports: () => request<ImportJob[]>("GET", "/imports"),
+  importJob: (id: string) => request<ImportJob>("GET", `/imports/${id}`),
+  startImport: (repository: string) => request<ImportJob>("POST", "/imports", { repository }),
+  importEstimate: (id: string, provider?: string, model?: string) => {
+    const qs = new URLSearchParams();
+    if (provider) qs.set("provider", provider);
+    if (model) qs.set("model", model);
+    return request<ImportEstimate>("GET", `/imports/${id}/estimate?${qs}`);
+  },
+  startAnalysis: (id: string, body: { mode: AnalysisMode; provider?: string; model?: string }) =>
+    request<ImportJob>("POST", `/imports/${id}/analysis`, body),
+  cancelAnalysis: (id: string) => request<ImportJob>("POST", `/imports/${id}/analysis/cancel`),
+  resolveFolder: (id: string, folder: string, link: string | null) =>
+    request<ImportJob>("POST", `/imports/${id}/unmatched`, { folder, link }),
+  insights: (params: { range?: string; difficulty?: string; platform?: string }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
+    return request<Insights>("GET", `/insights?${qs}`);
+  },
   thread: (submissionId: string) => request<ChatThread>("GET", `/submissions/${submissionId}/chat`),
   sendChat: (
     submissionId: string,

@@ -244,3 +244,46 @@ async def test_bad_metadata_is_rejected(client, sessionmaker):
     token = await _token(client, sessionmaker)
     assert (await _capture(client, token, topic_tags=["<script>"])).status_code == 422
     assert (await _capture(client, token, frontend_id="12a")).status_code == 422
+
+
+# ---------------------------------------------------------------- metadata backfill
+
+
+async def test_extension_backfills_missing_metadata(client, sessionmaker):
+    token = await _token(client, sessionmaker)
+    auth = {"Authorization": f"Bearer {token}"}
+    await _capture(client, token, title=None, difficulty=None)
+
+    res = await client.get("/api/capture/metadata/missing", headers=auth)
+    assert res.json() == {"slugs": ["valid-parenthesis-string"]}
+
+    res = await client.post(
+        "/api/capture/metadata",
+        headers=auth,
+        json={
+            "problems": [
+                {
+                    "slug": "valid-parenthesis-string",
+                    "title": "Valid Parenthesis String",
+                    "difficulty": "Medium",
+                    "topic_tags": ["greedy", "stack"],
+                    "frontend_id": "678",
+                    "question_id": "678",
+                },
+                # Not one of this user's problems: ignored, never created.
+                {"slug": "two-sum", "difficulty": "Easy"},
+            ]
+        },
+    )
+    assert res.json() == {"updated": 1}
+    async with sessionmaker() as session:
+        problems = (await session.scalars(select(Problem))).all()
+    assert [(p.slug, p.difficulty, p.topic_tags) for p in problems] == [
+        ("valid-parenthesis-string", "Medium", ["greedy", "stack"])
+    ]
+    res = await client.get("/api/capture/metadata/missing", headers=auth)
+    assert res.json() == {"slugs": []}
+
+
+async def test_metadata_backfill_needs_a_token(client):
+    assert (await client.get("/api/capture/metadata/missing")).status_code == 401

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  batchMetadataQuery,
   buildCapture,
   checkSubmissionId,
   isAccepted,
+  parseBatchMetadata,
   parseCheck,
   parseMemory,
   parseQuestionMetadata,
@@ -116,4 +118,21 @@ it("reads problem metadata from LeetCode's GraphQL response", () => {
   const submit = { slug: "invalid-tweets", language: "mysql", code: "x", questionId: "1827" };
   const payload = buildCapture(submit, parseCheck("42", CHECK_ACCEPTED)!, "page title", parseQuestionMetadata(body));
   expect(payload).toMatchObject({ title: "Invalid Tweets", difficulty: "Easy", topic_tags: ["database"], frontend_id: "1683" });
+});
+
+it("looks up several problems in one GraphQL request", () => {
+  const { query, variables } = batchMetadataQuery(["two-sum", "rotting-oranges"]);
+  expect(query).toContain("q1: question(titleSlug: $s1)");
+  expect(variables).toEqual({ s0: "two-sum", s1: "rotting-oranges" });
+
+  const body = {
+    data: {
+      q0: { questionId: "1", questionFrontendId: "1", title: "Two Sum", difficulty: "Easy", topicTags: [{ slug: "hash-table" }] },
+      q1: null, // a slug LeetCode doesn't know still gets an item, so the server stops asking
+    },
+  };
+  expect(parseBatchMetadata(["two-sum", "gone"], body)).toEqual([
+    { slug: "two-sum", title: "Two Sum", difficulty: "Easy", topic_tags: ["hash-table"], frontend_id: "1", question_id: "1" },
+    { slug: "gone", title: null, difficulty: null, topic_tags: [], frontend_id: null, question_id: null },
+  ]);
 });

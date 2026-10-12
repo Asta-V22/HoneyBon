@@ -5,6 +5,7 @@ const LABELS: Record<SubmissionStatus, string> = {
   analyzing: "Analyzing",
   reviewed: "Reviewed",
   failed: "Failed",
+  imported: "Imported",
 };
 
 export function StatusChip({ status, detail }: { status: SubmissionStatus; detail?: string }) {

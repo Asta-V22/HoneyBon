@@ -81,7 +81,8 @@ export function ReviewPage() {
   const review = sub.review;
   const json = review?.review_json ?? null;
   const running = isRunning(sub);
-  const inQueue = sub.status === "queued" && !review;
+  const inQueue = (sub.status === "queued" && !review) || sub.status === "imported";
+  const quick = review?.kind === "tags" && !running;
   const problem = sub.problem;
 
   const content = (
@@ -123,6 +124,7 @@ export function ReviewPage() {
       {sub.status === "failed" && review?.error && <FailedBanner sub={sub} />}
       {inQueue && <QueuedBanner sub={sub} />}
       {json && <VerdictCard verdict={json.verdict} />}
+      {quick && <QuickAnalysisBanner sub={sub} />}
 
       <div ref={bodyRef} className={`grid gap-6 ${discussOpen ? "" : "lg:grid-cols-2"}`}>
         <section aria-labelledby="your-code" className="flex min-w-0 flex-col gap-3">
@@ -529,12 +531,31 @@ function QueuedBanner({ sub }: { sub: Submission }) {
   return (
     <Card className="flex flex-wrap items-center gap-3 p-4">
       <p className="min-w-0 flex-1 text-sm text-text-secondary">
-        Captured from LeetCode and waiting in your review queue.
+        {sub.source === "import"
+          ? "Imported from GitHub and not analysed yet."
+          : "Captured from LeetCode and waiting in your review queue."}
       </p>
       <Button variant="primary" onClick={() => analyze.mutate({})} disabled={analyze.isPending}>
         Analyze
       </Button>
       <ErrorText error={analyze.error} />
+    </Card>
+  );
+}
+
+/** A tags-only analysis from an import: the verdict above is all there is. */
+function QuickAnalysisBanner({ sub }: { sub: Submission }) {
+  const review = useReReview(sub);
+  return (
+    <Card className="flex flex-wrap items-center gap-3 p-4">
+      <p className="min-w-0 flex-1 text-sm text-text-secondary">
+        This is the quick import analysis: technique and complexity only. Get the full four-tier review to see your
+        code improved and the optimal approach.
+      </p>
+      <Button variant="primary" onClick={() => review.mutate({})} disabled={review.isPending}>
+        Full review
+      </Button>
+      <ErrorText error={review.error} />
     </Card>
   );
 }

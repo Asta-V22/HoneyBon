@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     chat_rate_limit_per_hour: int = 60
     # Recent chat turns kept verbatim; older ones are folded into a running summary.
     chat_history_char_budget: int = 12000
+    # The insight card only names a pattern that rests on at least this many problems.
+    insight_min_problems: int = 5
 
     @field_validator("database_url", mode="before")
     @classmethod

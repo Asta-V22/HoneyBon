@@ -18,6 +18,12 @@ class SubmissionStatus(StrEnum):
     ANALYZING = "analyzing"
     REVIEWED = "reviewed"
     FAILED = "failed"
+    IMPORTED = "imported"  # imported from GitHub, not analysed yet
+
+
+class ReviewKind(StrEnum):
+    FULL = "full"  # verdict + four tiers
+    TAGS = "tags"  # technique and complexity only (the cheap import pass)
 
 
 class ChatRole(StrEnum):
@@ -42,3 +48,4 @@ class ImportStatus(StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"

@@ -102,6 +102,17 @@ interview_caveat when that style would hurt in an interview, otherwise null.
 - pattern: the named pattern and 2–3 related problems (prefer LeetCode, with slugs)."""
 
 
+def tags_prompt(inp: ReviewInput) -> str:
+    return f"""{_problem_block(inp)}
+
+{_code_block(inp)}
+
+Classify this solution only; do not rewrite it.
+- summary: one or two sentences on what the code does and whether it is correct.
+- used_technique, time and space: what the code actually does.
+- optimal_techniques, optimal_time and optimal_space: the best known solution (among solutions with optimal time, the one with the least space). List the most standard technique first."""
+
+
 def repair_prompt(error: str) -> str:
     return f"""Your previous response did not match the required schema:
 

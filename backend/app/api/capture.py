@@ -14,11 +14,12 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUser, QueueDep, RedisDep, Session, enforce_rate_limit
-from app.api.submissions import _queue_review, get_or_create_problem, queue_metadata
+from app.api.submissions import _queue_review, queue_metadata
 from app.core.config import get_settings
 from app.core.crypto import generate_extension_token, hash_token
-from app.models import ExtensionToken, Submission, User
+from app.models import ExtensionToken, Problem, Submission, User
 from app.models.enums import CaptureMode, SubmissionSource, SubmissionStatus
+from app.problems import get_or_create_problem
 
 router = APIRouter(tags=["capture"])
 
@@ -121,17 +122,10 @@ TokenUser = Annotated[User, Depends(token_user)]
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-class CaptureIn(BaseModel):
-    slug: str = Field(max_length=200)
-    submission_id: str = Field(min_length=1, max_length=64, pattern=r"^\d+$")
-    status: str = Field(max_length=50)  # LeetCode's status_msg, e.g. "Accepted"
-    language: str = Field(min_length=1, max_length=32)
-    code: str = Field(min_length=1, max_length=100_000)
-    runtime_ms: int | None = Field(default=None, ge=0)
-    memory_kb: int | None = Field(default=None, ge=0)
-    submitted_at: datetime | None = None
-    # Metadata the extension read from LeetCode in the user's browser. The server's own fetch is
-    # often blocked from cloud IPs; these only fill fields that are still empty.
+class ProblemMetadataIn(BaseModel):
+    """Metadata the extension read from LeetCode in the user's browser. The server's own fetch
+    is often blocked from cloud IPs; these values only fill fields that are still empty."""
+
     title: str | None = Field(default=None, max_length=300)
     difficulty: str | None = Field(default=None, max_length=16)
     topic_tags: list[Annotated[str, Field(max_length=64, pattern=r"^[a-z0-9-]+$")]] = Field(
@@ -140,13 +134,25 @@ class CaptureIn(BaseModel):
     frontend_id: str | None = Field(default=None, max_length=16, pattern=r"^\d+$")
     question_id: str | None = Field(default=None, max_length=16, pattern=r"^\d+$")
 
-    @field_validator("slug")
-    @classmethod
-    def _valid_slug(cls, slug: str) -> str:
-        slug = slug.strip().lower()
-        if not _SLUG.match(slug):
-            raise ValueError("not a LeetCode problem slug")
-        return slug
+
+def _check_slug(slug: str) -> str:
+    slug = slug.strip().lower()
+    if not _SLUG.match(slug):
+        raise ValueError("not a LeetCode problem slug")
+    return slug
+
+
+class CaptureIn(ProblemMetadataIn):
+    slug: str = Field(max_length=200)
+    submission_id: str = Field(min_length=1, max_length=64, pattern=r"^\d+$")
+    status: str = Field(max_length=50)  # LeetCode's status_msg, e.g. "Accepted"
+    language: str = Field(min_length=1, max_length=32)
+    code: str = Field(min_length=1, max_length=100_000)
+    runtime_ms: int | None = Field(default=None, ge=0)
+    memory_kb: int | None = Field(default=None, ge=0)
+    submitted_at: datetime | None = None
+
+    _valid_slug = field_validator("slug")(_check_slug)
 
 
 class CaptureOut(BaseModel):
@@ -255,3 +261,76 @@ async def set_mode(body: ModeIn, user: TokenUser, session: Session) -> ModeOut:
     user.capture_mode = body.capture_mode
     await session.commit()
     return ModeOut(capture_mode=user.capture_mode, github_login=user.github_login)
+
+
+# ---------------------------------------------------------------- metadata backfill (token auth)
+
+METADATA_BATCH = 50
+
+
+class MissingOut(BaseModel):
+    slugs: list[str]
+
+
+class BackfillItem(ProblemMetadataIn):
+    slug: str = Field(max_length=200)
+
+    _valid_slug = field_validator("slug")(_check_slug)
+
+
+class BackfillIn(BaseModel):
+    problems: list[BackfillItem] = Field(max_length=METADATA_BATCH)
+
+
+class BackfillOut(BaseModel):
+    updated: int
+
+
+def _missing_metadata(user: User):
+    return (
+        select(Problem)
+        .where(
+            Problem.platform == "leetcode",
+            Problem.metadata_fetched_at.is_(None),
+            select(Submission.id)
+            .where(Submission.user_id == user.id, Submission.problem_id == Problem.id)
+            .exists(),
+        )
+        .order_by(Problem.slug)
+    )
+
+
+@router.get("/capture/metadata/missing", response_model=MissingOut)
+async def missing_metadata(user: TokenUser, session: Session) -> MissingOut:
+    """LeetCode problems of this user that still lack metadata, for the extension to look up."""
+    problems = (await session.scalars(_missing_metadata(user).limit(METADATA_BATCH))).all()
+    await session.commit()  # keep the token's last-used time
+    return MissingOut(slugs=[p.slug for p in problems])
+
+
+@router.post("/capture/metadata", response_model=BackfillOut)
+async def backfill_metadata(
+    body: BackfillIn, user: TokenUser, session: Session, redis: RedisDep
+) -> BackfillOut:
+    await enforce_rate_limit(redis, f"hb:rl:metadata:{user.id}", 60, 3600)
+    wanted = {p.slug: p for p in (await session.scalars(_missing_metadata(user))).all()}
+    updated = 0
+    for item in body.problems:
+        problem = wanted.get(item.slug)  # only this user's problems that still need it
+        if problem is None:
+            continue
+        await get_or_create_problem(
+            session,
+            "leetcode",
+            item.slug,
+            problem.url,
+            item.title,
+            item.difficulty,
+            item.topic_tags,
+            item.frontend_id,
+            item.question_id,
+        )
+        problem.metadata_fetched_at = datetime.now(UTC)
+        updated += 1
+    await session.commit()
+    return BackfillOut(updated=updated)

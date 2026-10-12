@@ -181,3 +181,46 @@ function safeJson(text: string): unknown {
 function asObject(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
+
+// ---------------------------------------------------------------- metadata backfill
+
+export interface BackfillItem {
+  slug: string;
+  title: string | null;
+  difficulty: string | null;
+  topic_tags: string[];
+  frontend_id: string | null;
+  question_id: string | null;
+}
+
+/** One GraphQL request for several problems: an aliased `question` field per slug. */
+export function batchMetadataQuery(slugs: string[]): { query: string; variables: Record<string, string> } {
+  const params = slugs.map((_, i) => `$s${i}: String!`).join(", ");
+  const fields = slugs
+    .map((_, i) => `q${i}: question(titleSlug: $s${i}) { questionId questionFrontendId title difficulty topicTags { slug } }`)
+    .join("\n  ");
+  return {
+    query: `query honeybonBatch(${params}) {\n  ${fields}\n}`,
+    variables: Object.fromEntries(slugs.map((slug, i) => [`s${i}`, slug])),
+  };
+}
+
+const TAG = /^[a-z0-9-]{1,64}$/;
+const DIGITS = /^\d{1,16}$/;
+
+/** Every slug gets an item, even one LeetCode doesn't know, so the server stops asking for it. */
+export function parseBatchMetadata(slugs: string[], body: unknown): BackfillItem[] {
+  const data = asObject(asObject(body)?.data) ?? {};
+  return slugs.map((slug, i) => {
+    const m = parseQuestionMetadata({ data: { question: data[`q${i}`] ?? null } });
+    const id = (v: string | null | undefined) => (v && DIGITS.test(v) ? v : null);
+    return {
+      slug,
+      title: m?.title?.slice(0, 300) ?? null,
+      difficulty: m?.difficulty ?? null,
+      topic_tags: (m?.topicTags ?? []).filter((t) => TAG.test(t)).slice(0, 30),
+      frontend_id: id(m?.frontendId),
+      question_id: id(m?.questionId),
+    };
+  });
+}

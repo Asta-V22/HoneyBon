@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { ModelPicker } from "../components/ModelPicker";
 import { Button, Card, ErrorText, Field, inputClass, PageHeader, SectionTitle } from "../components/ui";
@@ -16,6 +17,7 @@ export function SettingsPage() {
       <ProviderKeys me={me} />
       <DefaultModel me={me} />
       <ExtensionTokens />
+      <GitHubImport />
       <DataSection me={me} />
     </div>
   );
@@ -277,6 +279,29 @@ function ExtensionTokens() {
             ))}
           </ul>
         )}
+      </Card>
+    </section>
+  );
+}
+
+function GitHubImport() {
+  const { data: jobs } = useQuery({ queryKey: ["imports"], queryFn: api.imports });
+  const latest = jobs?.[0];
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionTitle aside="Past solutions from a public LeetHub-style repository">GitHub import</SectionTitle>
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <p className="text-sm text-text-secondary">
+          {latest
+            ? `${latest.repository}: ${latest.imported} imported${latest.pending ? `, ${latest.pending} not analysed yet` : ""}.`
+            : "Import the solutions you wrote before Honeybon so Insights has your history."}
+        </p>
+        <Link
+          to="/import"
+          className="inline-flex min-h-8 items-center rounded-lg border border-border-strong bg-chip px-3 text-[13px] text-text no-underline hover:bg-selected"
+        >
+          {latest ? "Open import" : "Import from GitHub"}
+        </Link>
       </Card>
     </section>
   );

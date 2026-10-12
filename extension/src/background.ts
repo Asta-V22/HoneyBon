@@ -1,7 +1,7 @@
 // Service worker: sends captures to Honeybon with the extension token, retries failures with
 // backoff (chrome.alarms survive the worker sleeping), and answers the popup.
 
-import type { CapturePayload } from "./leetcode";
+import { batchMetadataQuery, parseBatchMetadata, type CapturePayload } from "./leetcode";
 import {
   backoffMinutes,
   loadSettings,
@@ -15,6 +15,8 @@ import {
 } from "./shared";
 
 const RETRY_ALARM = "honeybon-retry";
+const METADATA_ALARM = "honeybon-metadata";
+const METADATA_ROUNDS = 4; // up to 4 x 50 problems per run
 
 class PermanentError extends Error {}
 
@@ -131,6 +133,7 @@ async function handle(message: Message): Promise<unknown> {
       await chrome.storage.local.set({
         settings: { serverUrl: normalizeServer(message.settings.serverUrl), token: message.settings.token.trim() },
       });
+      void backfillMetadata();
       return state();
     case "retryNow":
       await flushOutbox(true);
@@ -147,4 +150,51 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === RETRY_ALARM) void flushOutbox();
+  if (alarm.name === METADATA_ALARM) void backfillMetadata();
 });
+
+// ---------------------------------------------------------------- metadata backfill
+
+/**
+ * Honeybon's server is often blocked by LeetCode, so problems that arrive without metadata (most
+ * of all GitHub imports) get their difficulty and topic tags looked up here, from the user's own
+ * browser, and sent back. Only public problem metadata is read; never statements or cookies.
+ */
+async function backfillMetadata(): Promise<void> {
+  const { token } = await loadSettings();
+  if (!token) return;
+  let updated = 0;
+  try {
+    for (let round = 0; round < METADATA_ROUNDS; round++) {
+      const { slugs } = (await api("/capture/metadata/missing")) as { slugs: string[] };
+      if (slugs.length === 0) break;
+      for (let i = 0; i < slugs.length; i += 10) {
+        const chunk = slugs.slice(i, i + 10);
+        const response = await fetch("https://leetcode.com/graphql/", {
+          method: "POST",
+          credentials: "omit",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(batchMetadataQuery(chunk)),
+        });
+        if (!response.ok) throw new Error(`LeetCode answered ${response.status}`);
+        const problems = parseBatchMetadata(chunk, await response.json());
+        const res = (await api("/capture/metadata", { method: "POST", body: JSON.stringify({ problems }) })) as {
+          updated: number;
+        };
+        updated += res.updated;
+      }
+    }
+    await chrome.storage.local.set({ metadata: { at: new Date().toISOString(), updated, error: null } });
+  } catch (error) {
+    await chrome.storage.local.set({
+      metadata: { at: new Date().toISOString(), updated, error: (error as Error).message },
+    });
+  }
+}
+
+async function scheduleBackfill(): Promise<void> {
+  await chrome.alarms.create(METADATA_ALARM, { delayInMinutes: 1, periodInMinutes: 30 });
+}
+
+chrome.runtime.onInstalled.addListener(() => void scheduleBackfill());
+chrome.runtime.onStartup.addListener(() => void scheduleBackfill());

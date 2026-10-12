@@ -28,6 +28,7 @@ from app.models.enums import (
     ChatRole,
     ImportAnalysisMode,
     ImportStatus,
+    ReviewKind,
     SubmissionSource,
     SubmissionStatus,
 )
@@ -128,6 +129,9 @@ class Submission(_UUIDPk, _Timestamps, Base):
     runtime_ms: Mapped[int | None] = mapped_column(Integer)
     memory_kb: Mapped[int | None] = mapped_column(Integer)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    import_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("import_jobs.id", ondelete="SET NULL"), index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -141,6 +145,9 @@ class Review(_UUIDPk, _Timestamps, Base):
 
     submission_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("submissions.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[ReviewKind] = mapped_column(
+        _enum(ReviewKind), default=ReviewKind.FULL, server_default=ReviewKind.FULL.value
     )
     provider: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(100))
@@ -202,15 +209,32 @@ class ChatMessage(_UUIDPk, _Timestamps, Base):
 
 
 class ImportJob(_UUIDPk, _Timestamps, Base):
+    """One run of a GitHub import: fetching the repository, then (optionally) analysing it."""
+
     __tablename__ = "import_jobs"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    repository: Mapped[str] = mapped_column(String(300))
+    repository: Mapped[str] = mapped_column(String(300))  # "owner/name"
+    # Fetch phase.
     status: Mapped[ImportStatus] = mapped_column(_enum(ImportStatus), default=ImportStatus.PENDING)
-    analysis_mode: Mapped[ImportAnalysisMode | None] = mapped_column(_enum(ImportAnalysisMode))
-    total: Mapped[int] = mapped_column(Integer, default=0)
+    total: Mapped[int] = mapped_column(Integer, default=0)  # solution files found
     processed: Mapped[int] = mapped_column(Integer, default=0)
+    imported: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    duplicates: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Folders that are not "<id>-<slug>": [{folder, files: [{path, language, code}]}].
     unmatched_folders: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     error: Mapped[str | None] = mapped_column(Text)
+    # Analysis phase, chosen by the user after the fetch.
+    analysis_mode: Mapped[ImportAnalysisMode | None] = mapped_column(_enum(ImportAnalysisMode))
+    analysis_status: Mapped[ImportStatus | None] = mapped_column(_enum(ImportStatus))
+    analysis_provider: Mapped[str | None] = mapped_column(String(32))
+    analysis_model: Mapped[str | None] = mapped_column(String(100))
+    analysis_total: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    analysis_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    analysis_failed: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    analysis_error: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

@@ -4,6 +4,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
 import { ApiError } from "./lib/api";
 import { useMe } from "./lib/hooks";
+import { ImportPage } from "./pages/Import";
+import { InsightsPage } from "./pages/Insights";
 import { LibraryPage } from "./pages/Library";
 import { Login } from "./pages/Login";
 import { PastePage } from "./pages/Paste";
@@ -30,7 +32,8 @@ export function App() {
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route path="/today" element={<TodayPage />} />
             <Route path="/library" element={<LibraryPage />} />
-            <Route path="/insights" element={<Placeholder title="Insights" note="Technique analytics arrive in Phase 3." />} />
+            <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/import" element={<ImportPage />} />
             <Route path="/paste" element={<PastePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/review/:submissionId" element={<ReviewPage />} />

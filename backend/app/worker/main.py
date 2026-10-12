@@ -8,12 +8,14 @@ import logging
 import uuid
 from typing import Any
 
+from arq import func
 from arq.connections import RedisSettings
 from redis.asyncio import Redis
 
 from app.chat.service import run_chat_reply
 from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.imports.service import run_import, run_import_analysis
 from app.leetcode import ensure_metadata
 from app.models import Problem
 from app.reviews.service import run_review
@@ -47,9 +49,24 @@ async def fetch_problem_metadata(ctx: dict[str, Any], problem_id: str) -> None:
             await session.commit()
 
 
+async def import_repository(ctx: dict[str, Any], job_id: str) -> None:
+    await run_import(SessionLocal, ctx["redis"], uuid.UUID(job_id))
+
+
+async def analyze_import(ctx: dict[str, Any], job_id: str) -> None:
+    await run_import_analysis(SessionLocal, ctx["events"], ctx["redis"], uuid.UUID(job_id))
+
+
 def worker_options() -> dict[str, Any]:
     return {
-        "functions": [review_submission, chat_reply, fetch_problem_metadata],
+        "functions": [
+            review_submission,
+            chat_reply,
+            fetch_problem_metadata,
+            import_repository,
+            # One slice is about 4 minutes, plus the submission in progress when it ends.
+            func(analyze_import, timeout=900),
+        ],
         "on_startup": startup,
         "on_shutdown": shutdown,
         "redis_settings": RedisSettings.from_dsn(get_settings().redis_url),

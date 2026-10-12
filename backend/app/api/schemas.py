@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.enums import CaptureMode, SubmissionSource, SubmissionStatus
+from app.models.enums import CaptureMode, ReviewKind, SubmissionSource, SubmissionStatus
 
 
 class _Out(BaseModel):
@@ -77,6 +77,7 @@ class ProblemOut(_Out):
 
 class ReviewOut(_Out):
     id: uuid.UUID
+    kind: ReviewKind
     provider: str
     model: str
     served_model: str | None

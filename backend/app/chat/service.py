@@ -17,7 +17,7 @@ from app.models import ChatMessage, ChatThread, ProviderCredential, Review, Subm
 from app.models.enums import ChatMessageStatus, ChatRole
 from app.providers import get_adapter
 from app.providers.base import ChatRequest, Message, ProviderAdapter, ProviderError, Usage
-from app.reviews.service import _input
+from app.reviews.service import review_input
 
 log = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ async def run_chat_reply(
             request = ChatRequest(
                 model=reply.model,
                 system=chat_system(
-                    _input(submission), review.review_json if review else None, thread.summary
+                    review_input(submission), review.review_json if review else None, thread.summary
                 ),
                 messages=messages,
             )

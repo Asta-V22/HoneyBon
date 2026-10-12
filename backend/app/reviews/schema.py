@@ -142,3 +142,25 @@ class Review(_Model):
         elif self.tier2 is None or self.tier3 is None:
             raise ValueError("tiers 2 and 3 are required unless the solution is optimal")
         return self
+
+
+class TechniqueTags(_Model):
+    """The cheap analysis for imports: only what the avoidance matrix needs, in one short call.
+
+    Stored as a review of kind "tags" whose JSON is a `Verdict` with empty lists, so the Review
+    screen shows it with the same verdict card.
+    """
+
+    correct: bool
+    summary: str = Field(min_length=1, description="One or two sentences.")
+    time: Complexity
+    space: Complexity
+    used_technique: Technique
+    optimal_techniques: list[Technique] = Field(
+        min_length=1, description="Every technique that is equally optimal; most standard first."
+    )
+    optimal_time: Complexity
+    optimal_space: Complexity
+
+    def as_verdict(self) -> Verdict:
+        return Verdict(**self.model_dump(), is_optimal=False)  # is_optimal is derived

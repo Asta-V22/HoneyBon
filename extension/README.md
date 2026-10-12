@@ -32,6 +32,10 @@ card in `chrome://extensions`.
 - Failed sends (network, a sleeping server, rate limits) are kept and retried after 1, 2, 4, 8
   and 16 minutes; the popup shows what is waiting and has **Retry now**.
 
+- Every 30 minutes the extension asks Honeybon which of your problems still lack LeetCode metadata
+  (difficulty, topic tags; mostly GitHub imports) and looks them up from LeetCode's public GraphQL
+  API, because LeetCode blocks Honeybon's server. Only public problem metadata is read.
+
 All LeetCode-specific details (URLs, response fields) are in `src/leetcode.ts`, covered by
 `npm test`. If LeetCode changes its site, that is the file to update.
 

@@ -89,13 +89,31 @@ npm run build                                     # typecheck + build
 - LeetCode metadata (title, difficulty, tag slugs, internal question ID) comes from the public
   GraphQL API (`app/leetcode.py`), fetched by the `fetch_problem_metadata` job and before a review.
   It is blocked from Render's IPs in practice, so the extension also reads the metadata from
-  LeetCode in the user's browser and sends it with each capture; those values only fill empty
-  fields. Never fatal either way. Tests set `LEETCODE_METADATA=false`.
+  LeetCode in the user's browser and sends it with each capture, and backfills problems still
+  missing it; those values only fill empty fields. Never fatal either way. Tests set
+  `LEETCODE_METADATA=false`.
 
-## Planned
+## Import and insights (Phase 3)
 
-- Switch login to Clerk before Phase 3 (the GitHub import depends on it). Clerk production needs
-  a custom domain; `*.vercel.app` only supports its development instance.
+- GitHub import (`app/imports/`) reads a **public** repo as one tarball from codeload.github.com
+  (no API rate limit, no GitHub permissions), in memory only. LeetHub folders are
+  `<internal question ID>-<slug>`; title and difficulty come from each README's header, and the
+  README statement is never stored. Other folders with code go to `import_jobs.unmatched_folders`
+  for manual mapping or skipping.
+- Imported submissions have status `imported` until analysed and stay off Today. Dedupe: the
+  external ID hashes repo + path + normalized code, and identical code already captured for the
+  same problem (any source) is skipped, so re-syncing is safe.
+- Analysis is chosen after the fetch: `tags_only` (one `TechniqueTags` call, stored as a review of
+  kind `tags` whose JSON is a verdict with empty lists), `full`, or `none`. `analyze_import` runs in
+  ~4-minute slices that re-queue themselves, one submission at a time, under a Redis lock; it stops
+  after 3 failures in a row and can be cancelled and resumed.
+- Insights (`app/insights.py`, pure functions) use one row per problem: its latest submission with
+  a successful analysis. Rows of the matrix = the technique needed (the one used if it matched,
+  else the first optimal), columns = used. Low confidence = LeetCode tags imply techniques and none
+  is in the AI's optimal set (`TAG_TECHNIQUES`). The insight card needs `INSIGHT_MIN_PROBLEMS` (5)
+  and ignores low-confidence problems.
+- Topic tags for imports come from the extension: it polls `/api/capture/metadata/missing` every
+  30 minutes and posts LeetCode's metadata back (`/api/capture/metadata`, user's own problems only).
 
 ## Providers
 

@@ -16,9 +16,10 @@ from app.reviews.prompts import (
     part_a_prompt,
     part_b_prompt,
     repair_prompt,
+    tags_prompt,
 )
 from app.reviews.provider_schema import provider_schema
-from app.reviews.schema import Review, ReviewPartA, ReviewPartB
+from app.reviews.schema import Review, ReviewPartA, ReviewPartB, TechniqueTags, Verdict
 from app.reviews.validation import validate_as
 
 
@@ -96,3 +97,19 @@ async def generate_review(
         # An optimal solution skips straight to tier 4, whatever the model sent.
         part_b = part_b.model_copy(update={"tier2": None, "tier3": None})
     return Review(verdict=part_a.verdict, tier1=part_a.tier1, **part_b.model_dump(mode="json"))
+
+
+async def generate_tags(
+    adapter: ProviderAdapter, model: str, inp: ReviewInput, stats: CallStats
+) -> Verdict:
+    """The cheap import analysis: technique and complexity only, as a verdict with no tiers."""
+
+    def check(tags: TechniqueTags) -> str | None:
+        if len(set(tags.optimal_techniques)) != len(tags.optimal_techniques):
+            return "optimal_techniques must not contain duplicates"
+        return None
+
+    tags = await _call_validated(
+        adapter, model, TechniqueTags, tags_prompt(inp), stats, extra_check=check
+    )
+    return tags.as_verdict()

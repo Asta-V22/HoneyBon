@@ -1,8 +1,13 @@
-"""Recognize problem links and guess languages for pasted submissions."""
+"""Recognize problem links, guess languages, and find or create shared problem rows."""
 
 import hashlib
 import re
 from dataclasses import dataclass
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import Problem
 
 
 @dataclass(frozen=True)
@@ -64,3 +69,46 @@ def detect_language(code: str) -> str:
         if pattern.search(code):
             return language
     return "plaintext"
+
+
+def fallback_title(slug: str) -> str:
+    """A readable title from a slug, used until real metadata arrives."""
+    return slug.replace("-", " ").title()
+
+
+DIFFICULTIES = {"Easy", "Medium", "Hard"}
+
+
+async def get_or_create_problem(
+    session: AsyncSession,
+    platform: str,
+    slug: str,
+    url: str | None,
+    title: str | None = None,
+    difficulty: str | None = None,
+    topic_tags: list[str] | None = None,
+    frontend_id: str | None = None,
+    platform_question_id: str | None = None,
+) -> Problem:
+    """Problems are shared, so user-supplied metadata only fills empty fields; the server's own
+    LeetCode fetch overwrites it whenever that succeeds."""
+    problem = await session.scalar(
+        select(Problem).where(Problem.platform == platform, Problem.slug == slug)
+    )
+    if problem is None:
+        problem = Problem(platform=platform, slug=slug, url=url, topic_tags=[])
+        session.add(problem)
+    if title and not problem.title:
+        problem.title = title.strip()[:300]
+    if difficulty in DIFFICULTIES and not problem.difficulty:
+        problem.difficulty = difficulty
+    if topic_tags and not problem.topic_tags:
+        problem.topic_tags = topic_tags
+    if frontend_id and not problem.frontend_id:
+        problem.frontend_id = frontend_id
+    if platform_question_id and not problem.platform_question_id:
+        problem.platform_question_id = platform_question_id
+    if problem.title is None and platform == "leetcode":
+        problem.title = fallback_title(slug)
+    await session.flush()
+    return problem

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 
+import { InsightCardView } from "../components/InsightCard";
 import { SubmissionRow } from "../components/SubmissionRow";
 import { Button, Card, ErrorText, PageHeader, SectionTitle } from "../components/ui";
 import { api } from "../lib/api";
@@ -14,8 +15,10 @@ const dayLetter = new Intl.DateTimeFormat(undefined, { weekday: "narrow" });
 export function TodayPage() {
   const { data, error } = useQuery({
     queryKey: ["submissions", "recent"],
-    queryFn: () => api.submissions({ limit: 200 }),
+    // Imports are past work, not today's practice.
+    queryFn: () => api.submissions({ limit: 200, exclude_source: "import" }),
   });
+  const { data: insights } = useQuery({ queryKey: ["insights", "today"], queryFn: () => api.insights({}) });
   const now = new Date();
   const items = data?.items ?? [];
   const today = items.filter((i) => dayKey(new Date(i.created_at)) === dayKey(now));
@@ -53,13 +56,24 @@ export function TodayPage() {
         </div>
       </PageHeader>
 
+      {insights?.card && <InsightCardView card={insights.card} compact />}
+
       <div className="flex flex-wrap items-start gap-6">
       <section className="flex min-w-0 flex-[2_1_520px] flex-col gap-3">
         <SectionTitle aside={`${today.length} submission${today.length === 1 ? "" : "s"}`}>Today's activity</SectionTitle>
         <ErrorText error={error} />
         {today.length === 0 ? (
           <Card className="p-6 text-sm text-text-muted">
-            Nothing yet today. <Link to="/paste" className="text-accent-text">Paste a solution</Link> to get a review.
+            Nothing yet today. <Link to="/paste" className="text-accent-text">Paste a solution</Link> to get a review
+            {insights && insights.problems === 0 && (
+              <>
+                , or{" "}
+                <Link to="/import" className="text-accent-text">
+                  import your past solutions from GitHub
+                </Link>
+              </>
+            )}
+            .
           </Card>
         ) : (
           <Card className="overflow-hidden">
