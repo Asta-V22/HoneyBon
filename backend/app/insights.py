@@ -8,6 +8,7 @@ is not flagged.
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.reviews.taxonomy import ComplexityClass, Technique
 
@@ -93,6 +94,8 @@ class ProblemRow:
     optimal_time_class: str | None
     optimal_space_class: str | None
     topic_tags: list[str] = field(default_factory=list)
+    solved_at: datetime | None = None
+    source: str = "paste"
 
     @property
     def match(self) -> bool:

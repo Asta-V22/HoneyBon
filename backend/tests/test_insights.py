@@ -127,6 +127,8 @@ async def test_insights_endpoint(client, sessionmaker):
     assert body["card"]["technique"] == "hashing"
     assert body["card"]["avoided"] == 6
     assert body["cells"] == [{"needed": "hashing", "used": "brute_force", "count": 6, "worse": 6}]
+    assert {i["source"] for i in body["items"]} == {"import"}
+    assert all(i["solved_at"] for i in body["items"])
 
     hard = (await client.get("/api/insights", params={"difficulty": "Hard"})).json()
     assert hard["problems"] == 1 and hard["card"] is None

@@ -112,6 +112,11 @@ npm run build                                     # typecheck + build
   else the first optimal), columns = used. Low confidence = LeetCode tags imply techniques and none
   is in the AI's optimal set (`TAG_TECHNIQUES`). The insight card needs `INSIGHT_MIN_PROBLEMS` (5)
   and ignores low-confidence problems.
+- The Insights visual has four switchable views (choice kept in localStorage): Bars (default),
+  Flow (SVG Sankey, ≤12 techniques a side, rest folded into "Other"), Heatmap (shade = share of
+  the row) and Progress (monthly; imports have no solve date, so they form one "Before Honeybon"
+  baseline). All are built client-side from `items` by `frontend/src/lib/insightViews.ts`; the
+  grey "same complexity" fill is the `--neutral-mark` token.
 - Topic tags for imports come from the extension: it polls `/api/capture/metadata/missing` every
   30 minutes and posts LeetCode's metadata back (`/api/capture/metadata`, user's own problems only).
 

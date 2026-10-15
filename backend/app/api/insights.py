@@ -37,6 +37,8 @@ class ItemOut(BaseModel):
     match: bool
     worse: bool
     low_confidence: bool | None  # None: no LeetCode tags to check against
+    solved_at: datetime | None  # imports carry the import time, not when it was solved
+    source: str  # extension, paste or import
 
 
 class CardOut(BaseModel):
@@ -106,6 +108,8 @@ async def insights(
             optimal_time_class=r.optimal_time_class,
             optimal_space_class=r.optimal_space_class,
             topic_tags=list(p.topic_tags or []),
+            solved_at=s.submitted_at or s.created_at,
+            source=str(s.source),
         )
         for s, r, p in (await session.execute(query)).all()
     ]
@@ -135,6 +139,8 @@ async def insights(
                 match=r.match,
                 worse=r.worse,
                 low_confidence=r.low_confidence,
+                solved_at=r.solved_at,
+                source=r.source,
             )
             for r in sorted(rows, key=lambda r: r.title.lower())
         ],

@@ -212,6 +212,8 @@ export interface InsightItem {
   match: boolean;
   worse: boolean;
   low_confidence: boolean | null;
+  solved_at: string | null; // imports: the import time, not when it was solved
+  source: Submission["source"];
 }
 
 export interface Insights {

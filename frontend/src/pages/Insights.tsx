@@ -3,11 +3,15 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { InsightCardView } from "../components/InsightCard";
+import { FlowChart } from "../components/insights/FlowChart";
+import { Heatmap } from "../components/insights/Heatmap";
+import { ProgressChart } from "../components/insights/ProgressChart";
+import { TechniqueBars } from "../components/insights/TechniqueBars";
+import { useInsightsView, VIEWS, ViewSwitcher } from "../components/insights/ViewSwitcher";
 import { Chip } from "../components/StatusChip";
 import { Card, ErrorText, inputClass, PageHeader, SectionTitle } from "../components/ui";
 import { api, techniqueLabel, type InsightItem, type Insights } from "../lib/api";
-
-type Selection = { needed: string; used: string } | "worse" | "low";
+import { filterItems, monthLabel, OTHER, OUTCOME_LABELS, type Selection } from "../lib/insightViews";
 
 export function InsightsPage() {
   const [range, setRange] = useState("all");
@@ -70,7 +74,7 @@ export function InsightsPage() {
             </Card>
           )}
           <Stats data={data} onSelect={setSelection} />
-          <Matrix data={data} selection={selection} onSelect={setSelection} />
+          <Visual data={data} selection={selection} onSelect={setSelection} />
           <ProblemList items={filterItems(data.items, selection)} selection={selection} />
         </>
       )}
@@ -155,103 +159,45 @@ function Stats({ data, onSelect }: { data: Insights; onSelect: (s: Selection) =>
   );
 }
 
-/** Rows: the technique the problem needed. Columns: the one you used. The diagonal is a match. */
-function Matrix({ data, selection, onSelect }: { data: Insights; selection: Selection; onSelect: (s: Selection) => void }) {
-  const cells = new Map(data.cells.map((c) => [`${c.needed}|${c.used}`, c]));
-  const max = Math.max(1, ...data.cells.map((c) => c.count));
-  const isSelected = (n: string, u: string) => typeof selection === "object" && selection.needed === n && selection.used === u;
-
+function Visual({ data, selection, onSelect }: { data: Insights; selection: Selection; onSelect: (s: Selection) => void }) {
+  const [view, setView] = useInsightsView();
+  const props = { items: data.items, selection, onSelect };
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="matrix-h">
-      <SectionTitle aside="Click a cell to list its problems">
-        <span id="matrix-h">Approach-avoidance matrix</span>
-      </SectionTitle>
-      <Card className="overflow-x-auto p-3">
-        <table className="border-separate border-spacing-0.5 text-xs">
-          <caption className="sr-only">
-            Rows are the technique each problem needed, columns the technique you used; cells count problems.
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col" className="p-1.5 text-left align-bottom font-normal text-text-faint">
-                needed ↓ · used →
-              </th>
-              {data.used.map((u) => (
-                <th key={u} scope="col" className="h-28 w-10 p-1 align-bottom font-normal text-text-muted">
-                  <span className="inline-block origin-bottom-left translate-x-3 -rotate-45 whitespace-nowrap">
-                    {techniqueLabel(u)}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.needed.map((n) => (
-              <tr key={n}>
-                <th scope="row" className="p-1.5 pr-3 text-left font-normal whitespace-nowrap text-text-secondary">
-                  {techniqueLabel(n)}
-                </th>
-                {data.used.map((u) => {
-                  const c = cells.get(`${n}|${u}`);
-                  if (!c) return <td key={u} className="size-10 rounded-md bg-raised" />;
-                  const match = n === u;
-                  // One-hue sequential scale for the count; orange marks worse complexity.
-                  const strength = 0.12 + 0.6 * (c.count / max);
-                  const tip = `${techniqueLabel(n)} needed, ${techniqueLabel(u)} used: ${c.count} problem${c.count === 1 ? "" : "s"}${
-                    c.worse ? `, ${c.worse} with worse complexity` : ""
-                  }${match ? " (match)" : ""}`;
-                  return (
-                    <td key={u} className="p-0">
-                      <button
-                        type="button"
-                        title={tip}
-                        aria-label={tip}
-                        aria-pressed={isSelected(n, u)}
-                        onClick={() => onSelect({ needed: n, used: u })}
-                        className={`relative flex size-10 items-center justify-center rounded-md font-mono text-text ${
-                          isSelected(n, u) ? "outline-2 outline-offset-1 outline-accent" : ""
-                        } ${!match && c.worse ? "ring-1 ring-attention ring-inset" : ""}`}
-                        style={{ backgroundColor: `color-mix(in srgb, var(--accent) ${Math.round(strength * 100)}%, transparent)` }}
-                      >
-                        {c.count}
-                        {!match && c.worse > 0 && (
-                          <span className="absolute top-0.5 right-1 text-[10px] text-attention-text" aria-hidden>
-                            !
-                          </span>
-                        )}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
-        <span>Darker = more problems</span>
-        <span>Diagonal = you used the optimal technique</span>
-        <span>
-          <span className="text-attention-text">!</span> orange outline = a worse time or space complexity
-        </span>
-      </p>
+    <section className="flex flex-col gap-3" aria-labelledby="visual-h">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="visual-h" className="text-sm font-medium text-text-heading">
+          {VIEWS.find((v) => v.id === view)!.hint}
+        </h2>
+        <ViewSwitcher
+          view={view}
+          onChange={(v) => {
+            setView(v);
+            onSelect("worse"); // a selection from another view would be hard to place
+          }}
+        />
+      </div>
+      {view === "bars" && <TechniqueBars {...props} />}
+      {view === "flow" && <FlowChart {...props} />}
+      {view === "heatmap" && <Heatmap data={data} selection={selection} onSelect={onSelect} />}
+      {view === "progress" && <ProgressChart {...props} />}
     </section>
   );
 }
 
-function filterItems(items: InsightItem[], s: Selection): InsightItem[] {
-  if (s === "worse") return items.filter((i) => !i.match && i.worse);
-  if (s === "low") return items.filter((i) => i.low_confidence);
-  return items.filter((i) => i.needed === s.needed && i.used === s.used);
+function selectionTitle(s: Selection): string {
+  if (s === "worse") return "Another technique, worse complexity";
+  if (s === "low") return "Low confidence: the AI disagrees with LeetCode's tags";
+  if (s.kind === "cell") return `${techniqueLabel(s.needed)} needed · ${techniqueLabel(s.used)} used`;
+  if (s.kind === "bar") return `${techniqueLabel(s.needed)} needed · ${OUTCOME_LABELS[s.outcome].toLowerCase()}`;
+  if (s.kind === "flow") {
+    const [n, u] = s.label.split("|").slice(0, 2).map((id) => (id === OTHER ? "Other" : techniqueLabel(id)));
+    return `${n} needed · ${u} used · ${OUTCOME_LABELS[s.outcome].toLowerCase()}`;
+  }
+  return s.key === "baseline" ? "Imported before Honeybon" : `Solved in ${monthLabel(s.key)}`;
 }
 
 function ProblemList({ items, selection }: { items: InsightItem[]; selection: Selection }) {
-  const title =
-    selection === "worse"
-      ? "Another technique, worse complexity"
-      : selection === "low"
-        ? "Low confidence: the AI disagrees with LeetCode's tags"
-        : `${techniqueLabel(selection.needed)} needed · ${techniqueLabel(selection.used)} used`;
+  const title = selectionTitle(selection);
   return (
     <section className="flex flex-col gap-3">
       <SectionTitle aside={`${items.length} problem${items.length === 1 ? "" : "s"}`}>{title}</SectionTitle>
