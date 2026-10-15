@@ -25,7 +25,14 @@ function showError(text: string | null): void {
 }
 
 function render(state: PopupState): void {
-  const { connected, connectionError, last, outbox, settings } = state;
+  const { connected, connectionError, last, outbox, settings, update } = state;
+
+  const updateLink = $<HTMLAnchorElement>("update");
+  updateLink.hidden = !update;
+  if (update) {
+    updateLink.href = update.url;
+    updateLink.textContent = `Update available: v${update.version} · Download`;
+  }
 
   $("status").textContent = connected
     ? `Connected as ${connected.login}`

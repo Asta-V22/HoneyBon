@@ -1,10 +1,11 @@
 {
   "name": "honeybon-extension",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && node build.mjs",
+    "build:release": "tsc --noEmit && node build.mjs --release",
     "watch": "node build.mjs --watch",
     "test": "vitest run"
   },

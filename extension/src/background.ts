@@ -13,12 +13,17 @@ import {
   type Message,
   type OutboxItem,
   type PopupState,
+  latestRelease,
+  RELEASES_API,
+  compareVersions,
+  type UpdateInfo,
 } from "./shared";
 import { parseVerifyRequest, VERIFY_TTL_MS, type VerifyRequest } from "./verify";
 
 const RETRY_ALARM = "honeybon-retry";
 const METADATA_ALARM = "honeybon-metadata";
 const METADATA_ROUNDS = 4; // up to 4 x 50 problems per run
+const UPDATE_ALARM = "honeybon-update-check";
 
 class PermanentError extends Error {}
 
@@ -119,7 +124,14 @@ async function state(): Promise<PopupState> {
       connectionError = (error as Error).message;
     }
   }
-  return { settings, connected, connectionError, last: (last as CaptureStatus) ?? null, outbox: await getOutbox() };
+  return {
+    settings,
+    update: await availableUpdate(),
+    connected,
+    connectionError,
+    last: (last as CaptureStatus) ?? null,
+    outbox: await getOutbox(),
+  };
 }
 
 async function handle(message: Message, sender: chrome.runtime.MessageSender): Promise<unknown> {
@@ -160,6 +172,7 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === RETRY_ALARM) void flushOutbox();
   if (alarm.name === METADATA_ALARM) void backfillMetadata();
+  if (alarm.name === UPDATE_ALARM) void checkForUpdate();
 });
 
 // ---------------------------------------------------------------- verify on LeetCode
@@ -248,6 +261,29 @@ async function backfillMetadata(): Promise<void> {
 
 async function scheduleBackfill(): Promise<void> {
   await chrome.alarms.create(METADATA_ALARM, { delayInMinutes: 1, periodInMinutes: 30 });
+  await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 2, periodInMinutes: 24 * 60 });
+}
+
+// ---------------------------------------------------------------- update check
+
+/**
+ * Installs from a GitHub release zip never update themselves, so once a day the extension looks
+ * up the newest `ext-v*` release and the popup offers a download link. Failures are ignored.
+ */
+async function checkForUpdate(): Promise<void> {
+  try {
+    const response = await fetch(RELEASES_API, { headers: { Accept: "application/vnd.github+json" } });
+    if (!response.ok) return;
+    const latest = latestRelease(await response.json());
+    await chrome.storage.local.set({ latestRelease: latest });
+  } catch {
+    // offline or rate-limited; try again tomorrow
+  }
+}
+
+async function availableUpdate(): Promise<UpdateInfo | null> {
+  const { latestRelease: latest } = (await chrome.storage.local.get("latestRelease")) as { latestRelease?: UpdateInfo | null };
+  return latest && compareVersions(latest.version, chrome.runtime.getManifest().version) > 0 ? latest : null;
 }
 
 chrome.runtime.onInstalled.addListener(() => void scheduleBackfill());

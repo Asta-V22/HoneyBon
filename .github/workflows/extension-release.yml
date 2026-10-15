@@ -1,0 +1,62 @@
+# Publishes the Chrome extension as a zip on GitHub Releases when a tag like ext-v0.3.1 is pushed.
+# Bump the version in extension/static/manifest.json and extension/package.json first.
+name: Extension release
+
+on:
+  push:
+    tags: ["ext-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - run: npm ci
+
+      - name: Tag matches the manifest version
+        run: |
+          version=$(node -p "require('./static/manifest.json').version")
+          if [ "ext-v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match manifest version $version" >&2
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - run: npm test
+
+      - run: npm run build:release
+
+      - name: Zip
+        run: cd dist && zip -r "../honeybon-extension-v$VERSION.zip" .
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          Honeybon Chrome extension v$VERSION.
+
+          **Install**
+          1. Download \`honeybon-extension-v$VERSION.zip\` below and extract it to a folder you'll keep (for example \`Documents/honeybon-extension\`).
+          2. Open \`chrome://extensions\` and turn on **Developer mode** (top right).
+          3. Click **Load unpacked** and pick that folder.
+          4. Open the extension's popup, paste a token from Honeybon → Settings → Extension tokens, and save.
+
+          **Update from an earlier version**
+          Extract the new zip over the same folder, replacing its files, then press the reload icon on the extension's card in \`chrome://extensions\`. Same folder = same extension, so your token and settings stay.
+          EOF
+          gh release create "$GITHUB_REF_NAME" "honeybon-extension-v$VERSION.zip" \
+            --title "Honeybon extension v$VERSION" --notes-file notes.md

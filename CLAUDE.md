@@ -14,7 +14,9 @@ Visual reference: the approved mockup at https://claude.ai/artifact/2Q8itrsBcMLt
   - `app/worker/` — arq tasks; every LLM call, import and analysis runs here, never in the API
 - `frontend/` — React 19 + TypeScript + Vite + Tailwind v4 + TanStack Query
 - `extension/` — Chrome MV3 extension (TypeScript, esbuild). LeetCode specifics only in
-  `src/leetcode.ts`; build with `npm run build`, load `extension/dist` unpacked
+  `src/leetcode.ts`; build with `npm run build`, load `extension/dist` unpacked. Users install it
+  from a GitHub Releases zip: pushing a tag `ext-vX.Y.Z` (matching `static/manifest.json`) runs
+  `.github/workflows/extension-release.yml`; the popup shows an update link from the releases API
 
 ## Commands
 

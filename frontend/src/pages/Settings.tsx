@@ -199,6 +199,36 @@ function DataSection({ me }: { me: Me }) {
 
 const dateTime = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
+const EXTENSION_RELEASES = "https://github.com/Asta-V22/HoneyBon/releases/latest";
+
+/** Where to get the extension, and whether this browser has it (set by extension/src/bridge.ts). */
+function GetExtension() {
+  const installed = document.documentElement.dataset.honeybonExtension;
+  return (
+    <div className="flex flex-col gap-2 border-b border-divider pb-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <a href={EXTENSION_RELEASES} target="_blank" rel="noreferrer noopener" className="text-sm font-medium text-accent-text">
+          Get the Chrome extension
+        </a>
+        <span className="text-xs text-text-muted">
+          {installed ? `Installed in this browser: v${installed}` : "Not detected in this browser"}
+        </span>
+      </div>
+      <ol className="flex list-decimal flex-col gap-0.5 pl-5 text-[13px] text-text-secondary">
+        <li>Download the zip from the latest release and extract it to a folder you'll keep.</li>
+        <li>
+          Open <code className="font-mono text-xs">chrome://extensions</code> and turn on Developer mode.
+        </li>
+        <li>Click Load unpacked and pick that folder.</li>
+        <li>Create a token below and paste it into the extension's popup.</li>
+      </ol>
+      <p className="text-xs text-text-muted">
+        To update, extract the new zip over the same folder and press reload on the extension's card; your token stays. The popup tells you when a new version is out.
+      </p>
+    </div>
+  );
+}
+
 function ExtensionTokens() {
   const qc = useQueryClient();
   const { data: tokens, error } = useQuery({ queryKey: ["tokens"], queryFn: api.tokens });
@@ -225,6 +255,7 @@ function ExtensionTokens() {
         Extension tokens
       </SectionTitle>
       <Card className="flex flex-col gap-4 p-4">
+        <GetExtension />
         <form
           className="flex flex-wrap items-end gap-2"
           onSubmit={(e) => {

@@ -3,22 +3,41 @@
 Sends your **accepted** LeetCode submissions to Honeybon, so reviews show up on Today without
 pasting anything.
 
-## Install (developer mode)
+## Install from a release
 
-```sh
-cd extension
-npm install
-npm run build        # creates dist/
-```
-
-1. Open `chrome://extensions` and turn on **Developer mode**.
-2. **Load unpacked** → choose `extension/dist`.
+1. Download `honeybon-extension-v<version>.zip` from the
+   [latest release](https://github.com/Asta-V22/HoneyBon/releases/latest) and extract it to a
+   folder you'll keep.
+2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick that
+   folder.
 3. In Honeybon, go to **Settings → Extension tokens**, create a token and copy it.
 4. Click the Honeybon icon in Chrome's toolbar → **Connection settings**, paste the token, **Save**.
    The popup should say "Connected as <your GitHub name>".
 
-After pulling new code, run `npm run build` again and press the reload icon on the extension's
-card in `chrome://extensions`.
+**Updating.** Unpacked extensions don't update themselves. Once a day the extension checks the
+releases and the popup shows "Update available" with a download link. Extract the new zip over the
+same folder and press the reload icon on its card in `chrome://extensions`. The same folder keeps
+the same extension ID, so the token and settings stay.
+
+## Build from source
+
+```sh
+cd extension
+npm install
+npm run build        # creates dist/ (includes localhost:5173 for local development)
+```
+
+Load `extension/dist` unpacked as above. After pulling new code, run `npm run build` again and
+press reload on the extension's card.
+
+## Publishing a release
+
+1. Bump `version` in `static/manifest.json` and `package.json` (they must match).
+2. Commit, then push a tag: `git tag ext-v0.3.1 && git push origin ext-v0.3.1`.
+3. `.github/workflows/extension-release.yml` checks the tag against the manifest, runs the tests,
+   builds with `npm run build:release` (no localhost entries) and publishes the zip as a release.
+
+Icons are drawn by `node scripts/make-icons.mjs` into `static/icons/`.
 
 ## How it works
 
