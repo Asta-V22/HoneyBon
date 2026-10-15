@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
 import { api, type CaptureMode, type Me } from "../lib/api";
+import { PALETTE_SHORTCUT } from "./CommandPalette";
 import { useUpdateMe } from "../lib/hooks";
 
 const MODES: { id: CaptureMode; label: string; hint: string }[] = [
@@ -71,7 +72,7 @@ const NAV = [
   },
 ];
 
-export function Sidebar({ me }: { me: Me }) {
+export function Sidebar({ me, onSearch }: { me: Me; onSearch: () => void }) {
   const qc = useQueryClient();
   const update = useUpdateMe();
   const mode = me.capture_mode;
@@ -92,6 +93,8 @@ export function Sidebar({ me }: { me: Me }) {
 
       <button
         type="button"
+        onClick={onSearch}
+        aria-keyshortcuts="Meta+K Control+K"
         className="flex min-h-9 w-full items-center gap-2 rounded-lg border border-border-strong bg-raised px-2.5 text-left text-[13px] text-text-muted"
       >
         {icon(
@@ -102,7 +105,7 @@ export function Sidebar({ me }: { me: Me }) {
         )}
         <span className="flex-1">Search or jump to…</span>
         <kbd className="rounded border border-border-strong px-1.5 font-mono text-[11px] text-text-faint">
-          ⌘K
+          {PALETTE_SHORTCUT}
         </kbd>
       </button>
 

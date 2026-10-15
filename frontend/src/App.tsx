@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
+import { CommandPalette, useCommandPalette } from "./components/CommandPalette";
 import { Sidebar } from "./components/Sidebar";
 import { ApiError } from "./lib/api";
 import { useMe } from "./lib/hooks";
@@ -16,6 +17,7 @@ import { TodayPage } from "./pages/Today";
 
 export function App() {
   const { data: me, error, isLoading } = useMe();
+  const [paletteOpen, setPaletteOpen] = useCommandPalette();
 
   if (isLoading) return <Starting />;
   if (error instanceof ApiError && error.status === 401) return <Login />;
@@ -25,7 +27,8 @@ export function App() {
 
   return (
     <div className="flex min-h-screen flex-wrap">
-      <Sidebar me={me} />
+      <Sidebar me={me} onSearch={() => setPaletteOpen(true)} />
+      <CommandPalette me={me} open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <main className="min-w-0 flex-[999_1_560px] px-4 pt-9 pb-16 sm:px-10">
         <div className="mx-auto max-w-[1120px]">
           <Routes>
