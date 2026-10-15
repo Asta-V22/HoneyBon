@@ -1,6 +1,7 @@
 // Types and storage shared by the background worker, content script and popup.
 
 import type { CapturePayload } from "./leetcode";
+import type { VerifyRequest } from "./verify";
 
 export const DEFAULT_SERVER = "https://honey-bon.vercel.app";
 
@@ -31,7 +32,10 @@ export type Message =
   | { type: "state" }
   | { type: "setMode"; mode: CaptureMode }
   | { type: "saveSettings"; settings: Settings }
-  | { type: "retryNow" };
+  | { type: "retryNow" }
+  | { type: "verify:set"; request: VerifyRequest }
+  | { type: "verify:get"; slug: string }
+  | { type: "verify:clear"; slug: string };
 
 export interface PopupState {
   settings: Settings;

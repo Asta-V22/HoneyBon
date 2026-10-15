@@ -35,6 +35,11 @@ card in `chrome://extensions`.
 - Every 30 minutes the extension asks Honeybon which of your problems still lack LeetCode metadata
   (difficulty, topic tags; mostly GitHub imports) and looks them up from LeetCode's public GraphQL
   API, because LeetCode blocks Honeybon's server. Only public problem metadata is read.
+- **Verify on LeetCode**: the Review page hands a tier's code to `src/bridge.ts` (a content
+  script on the Honeybon app), which the background keeps in session storage for 30 minutes.
+  On that problem's LeetCode page, a bar offers **Paste into editor**; the page hook replaces the
+  editor's code as one undoable edit (Ctrl+Z restores yours) and warns first if the editor is set
+  to another language. Nothing is run or submitted; that stays your click. Details: `src/verify.ts`.
 
 All LeetCode-specific details (URLs, response fields) are in `src/leetcode.ts`, covered by
 `npm test`. If LeetCode changes its site, that is the file to update.

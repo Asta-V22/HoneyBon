@@ -7,6 +7,7 @@ import { DiscussionPanel } from "../components/DiscussionPanel";
 import { ModelPicker } from "../components/ModelPicker";
 import { Prose } from "../components/Prose";
 import { Chip, StatusChip } from "../components/StatusChip";
+import { VerifyOnLeetCode } from "../components/VerifyOnLeetCode";
 import { Button, Card, ErrorText, inputClass } from "../components/ui";
 import { api, PROVIDER_LABELS, techniqueLabel, type Complexity, type ReviewJson, type Submission } from "../lib/api";
 import { useMe } from "../lib/hooks";
@@ -84,6 +85,8 @@ export function ReviewPage() {
   const inQueue = (sub.status === "queued" && !review) || sub.status === "imported";
   const quick = review?.kind === "tags" && !running;
   const problem = sub.problem;
+  // Solutions can be tried on LeetCode only for LeetCode problems.
+  const leetcodeSlug = problem.platform === "leetcode" ? problem.slug : null;
 
   const content = (
     <div className="flex min-w-0 flex-col gap-6">
@@ -158,6 +161,9 @@ export function ReviewPage() {
                   ))}
                 </ul>
               )}
+              {leetcodeSlug && (
+                <VerifyOnLeetCode slug={leetcodeSlug} language={sub.language} code={json.tier1.code} label="Tier 1 · Improved" />
+              )}
             </Tier>
           ) : running ? (
             <Pending>Reading your code…</Pending>
@@ -165,7 +171,7 @@ export function ReviewPage() {
 
           {json && (json.tier4 ? (
             revealed ? (
-              <LaterTiers json={json} language={sub.language} />
+              <LaterTiers json={json} language={sub.language} leetcodeSlug={leetcodeSlug} />
             ) : (
               <Card className="flex flex-col items-start gap-3 p-5">
                 <p className="text-sm text-text-secondary">
@@ -365,7 +371,9 @@ function List({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function LaterTiers({ json, language }: { json: ReviewJson; language: string }) {
+function LaterTiers({ json, language, leetcodeSlug }: { json: ReviewJson; language: string; leetcodeSlug: string | null }) {
+  const verify = (code: string, label: string) =>
+    leetcodeSlug && <VerifyOnLeetCode slug={leetcodeSlug} language={language} code={code} label={label} />;
   return (
     <>
       {json.verdict.is_optimal && (
@@ -380,6 +388,7 @@ function LaterTiers({ json, language }: { json: ReviewJson; language: string }) 
             <CodeView code={json.tier2.code} language={language} label="Tier 2 code" />
           </Card>
           <ComplexityLine time={json.tier2.time} space={json.tier2.space} />
+          {verify(json.tier2.code, "Tier 2 · Slightly better")}
         </Tier>
       )}
       {json.tier3 && (
@@ -389,6 +398,7 @@ function LaterTiers({ json, language }: { json: ReviewJson; language: string }) 
             <CodeView code={json.tier3.code} language={language} label="Optimal code" />
           </Card>
           <ComplexityLine time={json.tier3.time} space={json.tier3.space} />
+          {verify(json.tier3.code, "Tier 3 · Optimal")}
         </Tier>
       )}
       {json.tier4 && (
@@ -402,6 +412,7 @@ function LaterTiers({ json, language }: { json: ReviewJson; language: string }) 
               In an interview: {json.tier4.interview_caveat}
             </p>
           )}
+          {verify(json.tier4.code, "Tier 4 · CP master")}
         </Tier>
       )}
       {json.pattern && (

@@ -115,6 +115,17 @@ npm run build                                     # typecheck + build
 - Topic tags for imports come from the extension: it polls `/api/capture/metadata/missing` every
   30 minutes and posts LeetCode's metadata back (`/api/capture/metadata`, user's own problems only).
 
+## Verify on LeetCode
+
+- Each tier's code on Review has a "Verify on LeetCode" button (`components/VerifyOnLeetCode.tsx`),
+  LeetCode problems only. Honeybon never executes code: there is no sandbox, and AI output is
+  never presented as a run result.
+- With extension ≥ 0.3.0 (detected via `data-honeybon-extension` on `<html>`, set by
+  `extension/src/bridge.ts`), the code goes page → bridge → background (`chrome.storage.session`,
+  30 min) → a bar on the LeetCode problem page; its Paste button makes the MAIN-world page hook
+  replace the Monaco editor's text as one undoable edit. Without the extension the code is
+  copied to the clipboard. The tab is opened inside the click so it isn't pop-up blocked.
+
 ## Providers
 
 - Model lists and defaults: `PROVIDER_MODELS` in `app/providers/__init__.py` (first = default).

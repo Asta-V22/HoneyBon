@@ -4,6 +4,7 @@
 import { batchMetadataQuery, parseBatchMetadata, type CapturePayload } from "./leetcode";
 import {
   backoffMinutes,
+  DEFAULT_SERVER,
   loadSettings,
   MAX_ATTEMPTS,
   normalizeServer,
@@ -13,6 +14,7 @@ import {
   type OutboxItem,
   type PopupState,
 } from "./shared";
+import { parseVerifyRequest, VERIFY_TTL_MS, type VerifyRequest } from "./verify";
 
 const RETRY_ALARM = "honeybon-retry";
 const METADATA_ALARM = "honeybon-metadata";
@@ -120,7 +122,7 @@ async function state(): Promise<PopupState> {
   return { settings, connected, connectionError, last: (last as CaptureStatus) ?? null, outbox: await getOutbox() };
 }
 
-async function handle(message: Message): Promise<unknown> {
+async function handle(message: Message, sender: chrome.runtime.MessageSender): Promise<unknown> {
   switch (message.type) {
     case "capture":
       return send(message.payload);
@@ -138,11 +140,18 @@ async function handle(message: Message): Promise<unknown> {
     case "retryNow":
       await flushOutbox(true);
       return state();
+    case "verify:set":
+      return setVerify(message.request, sender);
+    case "verify:get":
+      return getVerify(message.slug, sender);
+    case "verify:clear":
+      if (fromLeetCode(sender)) await chrome.storage.session.remove(verifyKey(message.slug));
+      return null;
   }
 }
 
-chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
-  handle(message)
+chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) => {
+  handle(message, sender)
     .then((value) => sendResponse({ ok: true, value }))
     .catch((error: Error) => sendResponse({ ok: false, error: error.message }));
   return true; // respond asynchronously
@@ -152,6 +161,51 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === RETRY_ALARM) void flushOutbox();
   if (alarm.name === METADATA_ALARM) void backfillMetadata();
 });
+
+// ---------------------------------------------------------------- verify on LeetCode
+
+const verifyKey = (slug: string) => `verify:${slug}`;
+
+function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
+  try {
+    return sender.id === chrome.runtime.id && sender.url ? new URL(sender.url).origin : null;
+  } catch {
+    return null;
+  }
+}
+
+const fromLeetCode = (sender: chrome.runtime.MessageSender) => senderOrigin(sender) === "https://leetcode.com";
+
+/** Solutions come only from the Honeybon app, and wait in session storage (cleared with the browser). */
+async function setVerify(raw: VerifyRequest, sender: chrome.runtime.MessageSender): Promise<null> {
+  const origin = senderOrigin(sender);
+  const { serverUrl } = await loadSettings();
+  const allowed = new Set([new URL(DEFAULT_SERVER).origin, "http://localhost:5173", safeOrigin(serverUrl)]);
+  const request = parseVerifyRequest(raw);
+  if (!origin || !allowed.has(origin) || !request) return null;
+  await chrome.storage.session.set({ [verifyKey(request.slug)]: { request, at: Date.now() } });
+  return null;
+}
+
+async function getVerify(slug: string, sender: chrome.runtime.MessageSender): Promise<VerifyRequest | null> {
+  if (!fromLeetCode(sender)) return null;
+  const key = verifyKey(slug);
+  const item = (await chrome.storage.session.get(key))[key] as { request: VerifyRequest; at: number } | undefined;
+  if (!item) return null;
+  if (Date.now() - item.at > VERIFY_TTL_MS) {
+    await chrome.storage.session.remove(key);
+    return null;
+  }
+  return item.request;
+}
+
+function safeOrigin(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------- metadata backfill
 
